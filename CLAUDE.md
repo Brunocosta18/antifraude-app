@@ -41,26 +41,18 @@ Este documento é a referência principal para o assistente de IA e para a equip
 
 ## 🛠️ 3. Stack Tecnológica Recomendada (Custo Zero)
 
-- **Backend / API:** ✅ *Definido em ANTIGOL-001* — **Node.js 24 LTS + TypeScript + Fastify 5**, validação com **Zod**, testes com **Vitest** (`app.inject()`, sem abrir porta). Motivo: mesma linguagem do app React Native/Expo (tipos e regras compartilháveis, inclusive offline como fallback), execução local simples (`npm install && npm run dev`) e logger Pino com redação de campos (LGPD).
-  - Entrada: `src/index.ts` · Fábrica da app: `src/app.ts` · Configuração validada: `src/config/env.ts` · Rotas: `src/api/routes/`.
-  - `CORS_ORIGIN="*"` é bloqueado em produção. Logs de requisição registram apenas id, método, caminho (sem query string), status e tempo — nunca headers, IP ou corpo.
-  - ✅ *ANTIGOL-004* — `POST /api/v1/analyze` (`{type:'message'|'url', content}`, Zod em `src/api/schemas/analyze.ts`); erros sempre `{ error: { code, message, details? } }` (`src/api/errors.ts`, sem ecoar o conteúdo). Contrato completo em `docs/API.md`.
-  - ✅ *ANTIGOL-005* — Threat feed URLhaus (abuse.ch, Auth-Key gratuita em `URLHAUS_AUTH_KEY`): porta `ThreatFeed` em `src/core/types.ts`, adapter em `src/adapters/urlhaus.ts`. Só o hostname sai (máx. 3 por análise), prazo total ≤ 2s (`THREAT_FEED_TIMEOUT_MS`), `report.externalCheck` = `checked | unavailable | disabled`. Falha, timeout ou ausência de chave → graceful degradation para as regras locais; logs só com `reason`.
-  - ✅ *ANTIGOL-006* — Rate limit por IP só em `POST /api/v1/analyze` (`@fastify/rate-limit`, `global: false`, MIT, $0): `RATE_LIMIT_MAX` (padrão 30) por `RATE_LIMIT_WINDOW_MS` (padrão 60000). Excedido → 429 `RATE_LIMIT_EXCEEDED` via `ApiError` (formato padrão) + `X-RateLimit-*`/`Retry-After`. Contadores só em memória; IP nunca é logado nem persistido. Atrás de proxy, configurar `trustProxy` no deploy.
-- **Frontend / Mobile:** React Native / Expo ou Flutter (Cross-platform para Android e iOS com foco inicial em formulários manuais e compartilhamento).
+- **Backend / API:** ✅ *Definido em ANTIGOL-001 até ANTIGOL-006* — **Node.js 24 LTS + TypeScript + Fastify 5**, validação com **Zod**, testes com **Vitest** (`app.inject()`, sem abrir porta). 
+  - Entrada: `src/index.ts` · Fábrica da app: `src/app.ts` · Configuração validada: `src/config/env.ts` (incluindo `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`) · Rotas: `src/api/routes/`.
+  - CORS e logs de requisição LGPD-compliant.
+  - ✅ *ANTIGOL-004* — `POST /api/v1/analyze` (`{type:'message'|'url', content}`, Zod em `src/api/schemas/analyze.ts`); erros padronizados em `src/api/errors.ts`. Contrato em `docs/API.md`.
+  - ✅ *ANTIGOL-005* — Threat feed URLhaus (abuse.ch, `URLHAUS_AUTH_KEY`): porta `ThreatFeed` em `src/core/types.ts`, adapter em `src/adapters/urlhaus.ts`. Timeout ≤ 2s, `report.externalCheck` = `checked | unavailable | disabled`. Graceful degradation para regras locais em caso de falha.
+  - ✅ *ANTIGOL-006* — Rate limit por IP em `POST /api/v1/analyze` (`@fastify/rate-limit`, `global: false`, MIT, $0): configurado via `RATE_LIMIT_MAX` (padrão 30) e `RATE_LIMIT_WINDOW_MS` (padrão 60000). Excedido → 429 `RATE_LIMIT_EXCEEDED` via `ApiError` + headers padrão `X-RateLimit-*`/`Retry-After`. Rota `/health` isenta.
+- **Frontend / Mobile:** React Native / Expo ou Flutter (Próxima fase — ANTIGOL-007+).
 - **Banco de Dados Local / Cache:** SQLite (local/dev) ou PostgreSQL (Free tier / Docker local).
 - **Inteligência de Ameaças (Free/Open):**
-  * PhishTank API (Verificação de phishing)
-  * Google Safe Browsing / Cloudflare Radar (Sinais de reputação)
-  * Regras Determinísticas / Expressões Regulares (Regex) criadas internamente para identificar padrões de golpes brasileiros (ex: Pix, urubu do pix, taxas do gov, links `.top`, `.xyz`, etc.).
-* **Domínios (offline):** `tldts` (MIT, Public Suffix List embutida) extrai o domínio registrável; sem chamadas de rede.
-* **Mapa de `src/core/` (ANTIGOL-003):**
-  * `types.ts`: `Signal`, `AnalysisReport`, níveis e rótulos PT-BR fixos.
-  * `rules/`: regras de mensagem (tabela declarativa em `message-rules.ts`) e `analyzeMessageRules`.
-  * `domain/`: marcas, listas (TLDs, encurtadores, palavras-isca), similaridade e `analyzeDomain`.
-  * `risk/risk-scorer.ts`: pesos por severidade, teto por categoria e limiares (qualquer sinal `critical` força Alto Risco).
-  * `analyzer.ts`: `analyzeMessage` e `analyzeUrl` (locais) e `analyzeMessageWithFeed` / `analyzeUrlWithFeed` (somam o `ThreatFeed`). Adaptadores externos só **somam** `Signal[]` ao scorer.
-* **Mapa de `src/adapters/` (ANTIGOL-005):** `urlhaus.ts` (`createUrlhausFeed`, `disabledThreatFeed`); testes com `fetchFn` falso, sem rede real.
+  * URLhaus Threat Feed (Integrado - ANTIGOL-005)
+  * Regras Determinísticas / Expressões Regulares (Regex) criadas internamente para identificar padrões de golpes brasileiros.
+- **Domínios (offline):** `tldts` (MIT, Public Suffix List embutida).
 
 ---
 
@@ -69,29 +61,26 @@ Este documento é a referência principal para o assistente de IA e para a equip
 ```text
 antifraude-app/
 ├── .env.example                # Exemplo de variáveis de ambiente (sem segredos)
-├── .gitignore                  # Arquivos e pastas ignorados pelo Git (ex: node_modules, .venv)
+├── .gitignore                  # Arquivos e pastas ignorados pelo Git
 ├── CLAUDE.md                   # Guia mestre da IA e regras do projeto
 ├── README.md                   # Apresentação do projeto para humanos
 ├── docs/                       # Documentação centralizada
 │   ├── PRODUCT_SCOPE.md        # Escopo do MVP e regras de negócio
 │   ├── ARCHITECTURE.md         # Arquitetura detalhada do sistema
-│   └── ROADMAP.md              # Backlog, épicos e tarefas (ex: ANTIGOL-001)
+│   ├── API.md                  # Contrato da API e descrições de endpoints
+│   └── ROADMAP.md              # Backlog, épicos e tarefas (ANTIGOL-001 a 015+)
 ├── src/                        # Código-fonte da aplicação
-│   ├── main.py                 # (ou index.ts) Ponto de entrada / Inicialização do servidor
+│   ├── index.ts                # Ponto de entrada / Inicialização do servidor
+│   ├── app.ts                  # Fábrica da aplicação Fastify
+│   ├── config/                 # Configurações validadas com Zod (env.ts)
 │   ├── api/                    # Camada de interface e rotas HTTP
-│   │   ├── middlewares/        # Controles de segurança (Rate Limiter, Sanitização, LGPD)
-│   │   └── routes/             # Endpoints (ex: rota de análise de links e textos)
-│   ├── core/                   # Núcleo de Inteligência Antifraude (Regras de negócio puras)
-│   │   ├── fraud_engine.py     # Orquestrador que junta todas as análises
-│   │   ├── regex_rules.py      # Padrões de golpes no Brasil (Pix, Pix falso, Correios)
-│   │   └── risk_scorer.py      # Calculador de nível de risco (Alto, Atenção, Normal)
-│   ├── adapters/               # Adaptadores para serviços externos (com tolerância a falhas)
-│   │   └── threat_feeds.py     # Integrações com APIs abertas (PhishTank, etc.)
+│   │   ├── plugins/            # Plugins do Fastify (rateLimit.ts)
+│   │   ├── routes/             # Endpoints (analyze.ts, health.ts)
+│   │   └── errors.ts           # Tratamento padronizado de erros
+│   ├── core/                   # Núcleo de Inteligência Antifraude (Regras puras)
+│   ├── adapters/               # Adaptadores para serviços externos (URLhaus, etc.)
 │   └── utils/                  # Funções utilitárias e mascaramento de dados (LGPD)
-└── tests/                      # Bateria de testes automatizados
-    ├── unit/                   # Testes unitários das regras de negócio e regex
-    ├── integration/            # Testes de integração das rotas da API
-    └── data/                   # Massa de dados sintéticos para testes (sem dados reais)
+└── tests/                      # Bateria de testes automatizados (Vitest)
 ```
 
 ---
