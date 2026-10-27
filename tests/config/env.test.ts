@@ -66,4 +66,25 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ THREAT_FEED_TIMEOUT_MS: value })).toThrow(/THREAT_FEED_TIMEOUT_MS/);
     });
   });
+
+  describe('rate limit', () => {
+    it('padrão é 30 requisições por 60000 ms', () => {
+      expect(loadConfig({})).toMatchObject({ rateLimitMax: 30, rateLimitWindowMs: 60000 });
+    });
+
+    it('lê o limite e a janela', () => {
+      expect(loadConfig({ RATE_LIMIT_MAX: '5', RATE_LIMIT_WINDOW_MS: '1000' })).toMatchObject({
+        rateLimitMax: 5,
+        rateLimitWindowMs: 1000,
+      });
+    });
+
+    it.each(['0', '10001', 'abc'])('rejeita RATE_LIMIT_MAX inválido (%s)', (value) => {
+      expect(() => loadConfig({ RATE_LIMIT_MAX: value })).toThrow(/RATE_LIMIT_MAX/);
+    });
+
+    it.each(['999', '3600001', 'abc'])('rejeita RATE_LIMIT_WINDOW_MS inválido (%s)', (value) => {
+      expect(() => loadConfig({ RATE_LIMIT_WINDOW_MS: value })).toThrow(/RATE_LIMIT_WINDOW_MS/);
+    });
+  });
 });

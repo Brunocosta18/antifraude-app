@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { analyzeMessageWithFeed, analyzeUrlWithFeed } from '../../core/analyzer.js';
 import type { ThreatFeed } from '../../core/types.js';
-import { invalidUrlError, unsupportedMediaTypeError, validationError, zodIssuesToDetails } from '../errors.js';
+import { invalidUrlError, rateLimitError, unsupportedMediaTypeError, validationError, zodIssuesToDetails } from '../errors.js';
 import { analyzeRequestSchema, analyzeResponseSchema } from '../schemas/analyze.js';
 
 /** Limite do corpo: 5000 caracteres de mensagem cabem com folga (UTF-8 + JSON). */
@@ -15,7 +15,10 @@ const JSON_CONTENT_TYPE = /^application\/(?:[\w.+-]+\+)?json\s*(?:;|$)/i;
  * POST /analyze — análise local somada ao `ThreatFeed` (só o hostname sai; falha → resultado local).
  * O conteúdo enviado nunca é devolvido, logado nem armazenado.
  */
-export const analyzeRoutes: FastifyPluginAsync<{ threatFeed: ThreatFeed }> = async (app, { threatFeed }) => {
+export const analyzeRoutes: FastifyPluginAsync<{ threatFeed: ThreatFeed; rateLimit: { max: number; timeWindow: number } }> = async (
+  app,
+  { threatFeed, rateLimit },
+) => {
   app.addHook('preValidation', async (request) => {
     const contentType = request.headers['content-type'];
     if (contentType !== undefined && !JSON_CONTENT_TYPE.test(contentType)) throw unsupportedMediaTypeError();
@@ -23,7 +26,12 @@ export const analyzeRoutes: FastifyPluginAsync<{ threatFeed: ThreatFeed }> = asy
 
   app.post(
     '/analyze',
-    { bodyLimit: ANALYZE_BODY_LIMIT, schema: { response: { 200: analyzeResponseSchema } } },
+    {
+      bodyLimit: ANALYZE_BODY_LIMIT,
+      schema: { response: { 200: analyzeResponseSchema } },
+      // Por IP, em memória; o 429 sai pelo errorHandler no formato padrão.
+      config: { rateLimit: { ...rateLimit, errorResponseBuilder: () => rateLimitError() } },
+    },
     async (request, reply) => {
       const parsed = analyzeRequestSchema.safeParse(request.body);
       if (!parsed.success) throw validationError(zodIssuesToDetails(parsed.error.issues));

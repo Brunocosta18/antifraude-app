@@ -15,7 +15,7 @@ describe('POST /api/v1/analyze', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp(loadConfig({ NODE_ENV: 'test', CORS_ORIGIN: ALLOWED_ORIGIN }));
+    app = await buildApp(loadConfig({ NODE_ENV: 'test', CORS_ORIGIN: ALLOWED_ORIGIN, RATE_LIMIT_MAX: '10000' }));
     await app.ready();
   });
 
@@ -223,7 +223,7 @@ describe('POST /api/v1/analyze', () => {
 
   describe('threat feed externo', () => {
     const postWithFeed = async (threatFeed: ThreatFeed, content: string) => {
-      const feedApp = await buildApp(loadConfig({ NODE_ENV: 'test', CORS_ORIGIN: ALLOWED_ORIGIN }), { threatFeed });
+      const feedApp = await buildApp(loadConfig({ NODE_ENV: 'test', CORS_ORIGIN: ALLOWED_ORIGIN, RATE_LIMIT_MAX: '10000' }), { threatFeed });
       await feedApp.ready();
       const res = await feedApp.inject({ method: 'POST', url: URL_PATH, payload: { type: 'url', content } });
       await feedApp.close();

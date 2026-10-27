@@ -15,6 +15,7 @@ const MESSAGES = {
   MALFORMED_JSON: 'O corpo da requisição não é um JSON válido.',
   PAYLOAD_TOO_LARGE: 'O corpo da requisição é grande demais.',
   UNSUPPORTED_MEDIA_TYPE: 'Use o tipo de conteúdo application/json.',
+  RATE_LIMIT_EXCEEDED: 'Muitas requisições enviadas. Tente novamente mais tarde.',
   NOT_FOUND: 'Rota não encontrada.',
   REQUEST_ERROR: 'A requisição não pôde ser processada.',
   INTERNAL_ERROR: 'Erro interno. Tente novamente mais tarde.',
@@ -49,6 +50,10 @@ export function validationError(details: ErrorDetail[]): ApiError {
 
 export function unsupportedMediaTypeError(): ApiError {
   return new ApiError(415, 'UNSUPPORTED_MEDIA_TYPE');
+}
+
+export function rateLimitError(): ApiError {
+  return new ApiError(429, 'RATE_LIMIT_EXCEEDED');
 }
 
 export function invalidUrlError(reason: string): ApiError {

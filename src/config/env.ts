@@ -23,6 +23,8 @@ const envSchema = z
       .optional()
       .transform((key) => (key ? key : null)),
     THREAT_FEED_TIMEOUT_MS: z.coerce.number().int().min(100).max(2000).default(2000),
+    RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10000).default(30),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
   })
   .transform((env) => ({
     ...env,
@@ -54,6 +56,9 @@ export interface AppConfig {
   /** `null` = feed URLhaus desligado (análise só local). */
   readonly urlhausAuthKey: string | null;
   readonly threatFeedTimeoutMs: number;
+  /** Máximo de requisições por IP em `POST /analyze` dentro da janela. */
+  readonly rateLimitMax: number;
+  readonly rateLimitWindowMs: number;
 }
 
 export class ConfigError extends Error {
@@ -85,7 +90,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new ConfigError(`Configuração inválida — ${details}`);
   }
 
-  const { NODE_ENV, HOST, PORT, LOG_LEVEL, CORS_ORIGIN, URLHAUS_AUTH_KEY, THREAT_FEED_TIMEOUT_MS } = parsed.data;
+  const {
+    NODE_ENV,
+    HOST,
+    PORT,
+    LOG_LEVEL,
+    CORS_ORIGIN,
+    URLHAUS_AUTH_KEY,
+    THREAT_FEED_TIMEOUT_MS,
+    RATE_LIMIT_MAX,
+    RATE_LIMIT_WINDOW_MS,
+  } = parsed.data;
   return Object.freeze({
     nodeEnv: NODE_ENV,
     host: HOST,
@@ -95,5 +110,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     appVersion: readAppVersion(),
     urlhausAuthKey: URLHAUS_AUTH_KEY,
     threatFeedTimeoutMs: THREAT_FEED_TIMEOUT_MS,
+    rateLimitMax: RATE_LIMIT_MAX,
+    rateLimitWindowMs: RATE_LIMIT_WINDOW_MS,
   });
 }

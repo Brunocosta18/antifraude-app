@@ -149,6 +149,7 @@ Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens s
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` diferente de JSON |
 | 422 | `VALIDATION_ERROR` | corpo ausente ou não-objeto, `type` desconhecido, `content` ausente, não-string, vazio, acima do limite, ou campos extras |
 | 422 | `INVALID_URL` | link rejeitado: `EMPTY`, `TOO_LONG`, `INVALID_URL`, `UNSUPPORTED_SCHEME`, `LOCAL_HOSTNAME` ou `PRIVATE_ADDRESS` |
+| 429 | `RATE_LIMIT_EXCEEDED` | limite de requisições por IP excedido; veja `Retry-After` |
 | 404 | `NOT_FOUND` | rota inexistente (inclui `GET /api/v1/analyze`) |
 | 4xx | `REQUEST_ERROR` | outro erro de cliente detectado pelo servidor (ex.: `Content-Length` inválido); o status original é mantido |
 | 500 | `INTERNAL_ERROR` | erro inesperado, sem detalhes |
@@ -188,6 +189,18 @@ Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens s
 ```json
 { "error": { "code": "UNSUPPORTED_MEDIA_TYPE", "message": "Use o tipo de conteúdo application/json." } }
 ```
+
+429 `RATE_LIMIT_EXCEEDED`:
+
+```json
+{ "error": { "code": "RATE_LIMIT_EXCEEDED", "message": "Muitas requisições enviadas. Tente novamente mais tarde." } }
+```
+
+### Limite de requisições
+
+Cada IP pode fazer **30 requisições por minuto** em `POST /api/v1/analyze` (configurável por `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`). Requisições inválidas também contam. `/health` não é limitado. Os contadores ficam só na memória do servidor durante a janela.
+
+Toda resposta desta rota traz `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (segundos até zerar). Ao exceder, a resposta é 429 com `Retry-After` (segundos).
 
 ### Exemplo com curl
 

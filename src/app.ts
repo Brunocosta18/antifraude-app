@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import { errorHandler, notFoundHandler } from './api/errors.js';
@@ -67,11 +68,18 @@ export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFee
     maxAge: 600,
   });
 
+  // global: false — o limite vale só nas rotas que o ativam (/health e 404 ficam fora). Contadores só em memória.
+  await app.register(rateLimit, { global: false });
+
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
   await app.register(healthRoutes, { appVersion: config.appVersion });
-  await app.register(analyzeRoutes, { prefix: '/api/v1', threatFeed });
+  await app.register(analyzeRoutes, {
+    prefix: '/api/v1',
+    threatFeed,
+    rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
+  });
 
   return app;
 }
