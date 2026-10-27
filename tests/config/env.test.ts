@@ -48,4 +48,22 @@ describe('loadConfig', () => {
       expect.objectContaining({ message: expect.not.stringContaining('valor-secreto') }),
     );
   });
+
+  describe('threat feed', () => {
+    it('chave vazia ou ausente vira null e o prazo padrão é 2000 ms', () => {
+      expect(loadConfig({ URLHAUS_AUTH_KEY: '  ' })).toMatchObject({ urlhausAuthKey: null, threatFeedTimeoutMs: 2000 });
+      expect(loadConfig({}).urlhausAuthKey).toBeNull();
+    });
+
+    it('lê a chave e o prazo', () => {
+      expect(loadConfig({ URLHAUS_AUTH_KEY: ' abc ', THREAT_FEED_TIMEOUT_MS: '500' })).toMatchObject({
+        urlhausAuthKey: 'abc',
+        threatFeedTimeoutMs: 500,
+      });
+    });
+
+    it.each(['2001', '99', 'abc'])('rejeita THREAT_FEED_TIMEOUT_MS inválido (%s)', (value) => {
+      expect(() => loadConfig({ THREAT_FEED_TIMEOUT_MS: value })).toThrow(/THREAT_FEED_TIMEOUT_MS/);
+    });
+  });
 });

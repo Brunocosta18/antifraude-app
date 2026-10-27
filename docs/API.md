@@ -1,6 +1,6 @@
 # API do Antifraude
 
-Referência da API HTTP (ANTIGOL-004). Toda a análise é local e determinística; nenhum conteúdo enviado é armazenado.
+Referência da API HTTP (ANTIGOL-004). A análise é local e determinística, somada (opcionalmente) a uma consulta ao URLhaus (ANTIGOL-005); nenhum conteúdo enviado é armazenado.
 
 - **Base URL local:** `http://127.0.0.1:3000` (porta conforme `.env`)
 - **Prefixo da API:** `/api/v1`
@@ -25,7 +25,22 @@ Limites: mensagem até **5000** caracteres, URL até **2048** caracteres, corpo 
 
 ### Response 200
 
-`{ "type", "report" }`. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice` e `disclaimer`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
+`{ "type", "report" }`. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice`, `disclaimer` e `externalCheck`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
+
+`externalCheck` informa a consulta à fonte externa de ameaças (URLhaus, abuse.ch):
+
+| Valor | Significado |
+|---|---|
+| `checked` | consultada com sucesso (sem sinais = nada listado) |
+| `unavailable` | falhou ou passou de 2 s; o resultado vem só das regras locais (e das consultas que deram certo) |
+| `disabled` | sem `URLHAUS_AUTH_KEY` configurada; análise apenas local |
+
+Sinais da fonte externa (categoria `threat_intel`):
+
+| ID | Quando | Severidade |
+|---|---|---|
+| `TI-URLHAUS-URL` | o link exato está listado no URLhaus | `critical` se ativo, `high` se inativo |
+| `TI-URLHAUS-HOST` | o site tem link ativo listado, sem match exato (ignorado para plataformas compartilhadas como github.com ou drive.google.com e para marcas oficiais) | `high` |
 
 Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNOWN_INDICATORS` (Nenhum Indicador Conhecido Encontrado). O app nunca afirma que algo é "100% seguro".
 
@@ -185,5 +200,6 @@ curl -s -X POST http://127.0.0.1:3000/api/v1/analyze \
 ### Privacidade
 
 - Nada é armazenado: o conteúdo é analisado em memória e descartado.
+- Com o URLhaus ativo, **somente o hostname** (nunca o caminho, a query ou a mensagem) é enviado ao abuse.ch, em até 3 hostnames distintos por análise. A URL exata é comparada localmente. Os logs de falha registram apenas o motivo (`timeout`, `network`, `http_status`, `invalid_response`, `too_large`).
 - O conteúdo enviado não volta na resposta, nem em mensagens de erro; os logs registram apenas id, método, caminho, status e tempo.
 - O resultado não é garantia de segurança: a análise usa sinais conhecidos e pode não detectar golpes novos.

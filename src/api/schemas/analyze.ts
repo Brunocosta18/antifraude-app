@@ -30,6 +30,7 @@ const signalSchema = {
         'fake_job',
         'domain',
         'url_structure',
+        'threat_intel',
       ],
     },
     severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
@@ -49,7 +50,7 @@ export const analyzeResponseSchema = {
     type: { type: 'string', enum: ['message', 'url'] },
     report: {
       type: 'object',
-      required: ['level', 'label', 'score', 'signals', 'advice', 'disclaimer'],
+      required: ['level', 'label', 'score', 'signals', 'advice', 'disclaimer', 'externalCheck'],
       additionalProperties: false,
       properties: {
         level: { type: 'string', enum: ['HIGH_RISK', 'NEEDS_ATTENTION', 'NO_KNOWN_INDICATORS'] },
@@ -58,6 +59,7 @@ export const analyzeResponseSchema = {
         signals: { type: 'array', items: signalSchema },
         advice: { type: 'array', items: { type: 'string' } },
         disclaimer: { type: 'string' },
+        externalCheck: { type: 'string', enum: ['checked', 'unavailable', 'disabled'] },
       },
     },
   },

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config/env.js';
-import { RISK_LABELS } from '../../src/core/types.js';
+import { RISK_LABELS, type ThreatFeed } from '../../src/core/types.js';
 import { LEGIT_URLS, SCAM_URLS } from '../fixtures/urls.js';
 import { LEGIT_MESSAGES, SCAM_MESSAGES } from '../fixtures/messages.js';
 
@@ -76,7 +76,7 @@ describe('POST /api/v1/analyze', () => {
 
       const body = res.json();
       expect(Object.keys(body).sort()).toEqual(['report', 'type']);
-      expect(Object.keys(body.report).sort()).toEqual(['advice', 'disclaimer', 'label', 'level', 'score', 'signals']);
+      expect(Object.keys(body.report).sort()).toEqual(['advice', 'disclaimer', 'externalCheck', 'label', 'level', 'score', 'signals']);
       expect(body.report.disclaimer).toEqual(expect.any(String));
       expect(body.report.disclaimer.length).toBeGreaterThan(0);
       expect(Array.isArray(body.report.advice)).toBe(true);
@@ -218,6 +218,54 @@ describe('POST /api/v1/analyze', () => {
       expect(res.statusCode).toBe(204);
       expect(res.headers['access-control-allow-origin']).toBe(ALLOWED_ORIGIN);
       expect(res.headers['access-control-allow-methods']).toContain('POST');
+    });
+  });
+
+  describe('threat feed externo', () => {
+    const postWithFeed = async (threatFeed: ThreatFeed, content: string) => {
+      const feedApp = await buildApp(loadConfig({ NODE_ENV: 'test', CORS_ORIGIN: ALLOWED_ORIGIN }), { threatFeed });
+      await feedApp.ready();
+      const res = await feedApp.inject({ method: 'POST', url: URL_PATH, payload: { type: 'url', content } });
+      await feedApp.close();
+      return res;
+    };
+
+    it('padrão de teste (sem chave): externalCheck "disabled"', async () => {
+      const res = await post({ type: 'url', content: 'exemplo.com.br' });
+      expect(res.json().report.externalCheck).toBe('disabled');
+    });
+
+    it('sinal do feed soma ao resultado: HIGH_RISK + "checked"', async () => {
+      const res = await postWithFeed(
+        {
+          check: async () => ({
+            status: 'checked',
+            signals: [
+              {
+                id: 'TI-URLHAUS-URL',
+                category: 'threat_intel',
+                severity: 'critical',
+                weight: 50,
+                title: 't',
+                explanation: 'e',
+                advice: 'a',
+              },
+            ],
+          }),
+        },
+        'exemplo.com.br',
+      );
+      const { report } = res.json();
+      expect(report.level).toBe('HIGH_RISK');
+      expect(report.externalCheck).toBe('checked');
+      expect(report.signals.map((x: { id: string }) => x.id)).toContain('TI-URLHAUS-URL');
+    });
+
+    it('feed que falha: 200 com resultado local e "unavailable"', async () => {
+      const res = await postWithFeed({ check: async () => ({ status: 'unavailable', signals: [] }) }, 'bradesc0.com.br');
+      expect(res.statusCode).toBe(200);
+      expect(res.json().report.externalCheck).toBe('unavailable');
+      expect(res.json().report.signals.length).toBeGreaterThan(0);
     });
   });
 });

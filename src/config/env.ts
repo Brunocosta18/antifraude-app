@@ -16,6 +16,13 @@ const envSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
     CORS_ORIGIN: z.string().trim().default('http://localhost:8081'),
+    // Opcional (chave gratuita do abuse.ch); vazio = feed desligado. Nunca aparece em mensagens de erro.
+    URLHAUS_AUTH_KEY: z
+      .string()
+      .trim()
+      .optional()
+      .transform((key) => (key ? key : null)),
+    THREAT_FEED_TIMEOUT_MS: z.coerce.number().int().min(100).max(2000).default(2000),
   })
   .transform((env) => ({
     ...env,
@@ -44,6 +51,9 @@ export interface AppConfig {
   /** `true` libera qualquer origem (apenas fora de produção); caso contrário, lista explícita. */
   readonly corsOrigin: true | readonly string[];
   readonly appVersion: string;
+  /** `null` = feed URLhaus desligado (análise só local). */
+  readonly urlhausAuthKey: string | null;
+  readonly threatFeedTimeoutMs: number;
 }
 
 export class ConfigError extends Error {
@@ -75,7 +85,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new ConfigError(`Configuração inválida — ${details}`);
   }
 
-  const { NODE_ENV, HOST, PORT, LOG_LEVEL, CORS_ORIGIN } = parsed.data;
+  const { NODE_ENV, HOST, PORT, LOG_LEVEL, CORS_ORIGIN, URLHAUS_AUTH_KEY, THREAT_FEED_TIMEOUT_MS } = parsed.data;
   return Object.freeze({
     nodeEnv: NODE_ENV,
     host: HOST,
@@ -83,5 +93,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logLevel: LOG_LEVEL,
     corsOrigin: CORS_ORIGIN.includes('*') ? true : Object.freeze([...CORS_ORIGIN]),
     appVersion: readAppVersion(),
+    urlhausAuthKey: URLHAUS_AUTH_KEY,
+    threatFeedTimeoutMs: THREAT_FEED_TIMEOUT_MS,
   });
 }

@@ -45,6 +45,7 @@ Este documento é a referência principal para o assistente de IA e para a equip
   - Entrada: `src/index.ts` · Fábrica da app: `src/app.ts` · Configuração validada: `src/config/env.ts` · Rotas: `src/api/routes/`.
   - `CORS_ORIGIN="*"` é bloqueado em produção. Logs de requisição registram apenas id, método, caminho (sem query string), status e tempo — nunca headers, IP ou corpo.
   - ✅ *ANTIGOL-004* — `POST /api/v1/analyze` (`{type:'message'|'url', content}`, Zod em `src/api/schemas/analyze.ts`); erros sempre `{ error: { code, message, details? } }` (`src/api/errors.ts`, sem ecoar o conteúdo). Contrato completo em `docs/API.md`.
+  - ✅ *ANTIGOL-005* — Threat feed URLhaus (abuse.ch, Auth-Key gratuita em `URLHAUS_AUTH_KEY`): porta `ThreatFeed` em `src/core/types.ts`, adapter em `src/adapters/urlhaus.ts`. Só o hostname sai (máx. 3 por análise), prazo total ≤ 2s (`THREAT_FEED_TIMEOUT_MS`), `report.externalCheck` = `checked | unavailable | disabled`. Falha, timeout ou ausência de chave → graceful degradation para as regras locais; logs só com `reason`.
 - **Frontend / Mobile:** React Native / Expo ou Flutter (Cross-platform para Android e iOS com foco inicial em formulários manuais e compartilhamento).
 - **Banco de Dados Local / Cache:** SQLite (local/dev) ou PostgreSQL (Free tier / Docker local).
 - **Inteligência de Ameaças (Free/Open):**
@@ -57,7 +58,8 @@ Este documento é a referência principal para o assistente de IA e para a equip
   * `rules/`: regras de mensagem (tabela declarativa em `message-rules.ts`) e `analyzeMessageRules`.
   * `domain/`: marcas, listas (TLDs, encurtadores, palavras-isca), similaridade e `analyzeDomain`.
   * `risk/risk-scorer.ts`: pesos por severidade, teto por categoria e limiares (qualquer sinal `critical` força Alto Risco).
-  * `analyzer.ts`: `analyzeMessage` e `analyzeUrl`. Adaptadores externos futuros só **somam** `Signal[]` ao scorer.
+  * `analyzer.ts`: `analyzeMessage` e `analyzeUrl` (locais) e `analyzeMessageWithFeed` / `analyzeUrlWithFeed` (somam o `ThreatFeed`). Adaptadores externos só **somam** `Signal[]` ao scorer.
+* **Mapa de `src/adapters/` (ANTIGOL-005):** `urlhaus.ts` (`createUrlhausFeed`, `disabledThreatFeed`); testes com `fetchFn` falso, sem rede real.
 
 ---
 
