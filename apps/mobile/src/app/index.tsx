@@ -1,3 +1,4 @@
+import { useNetworkState } from 'expo-network';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,8 +34,9 @@ export default function Index() {
   const [state, setState] = useState<ScreenState>({ status: 'idle' });
   const [retryIn, setRetryIn] = useState(0);
 
+  const offline = useNetworkState().isConnected === false;
   const loading = state.status === 'loading';
-  const disabled = loading || retryIn > 0 || content.trim().length === 0;
+  const disabled = loading || offline || retryIn > 0 || content.trim().length === 0;
   const counting = retryIn > 0;
 
   useEffect(() => {
@@ -64,6 +66,14 @@ export default function Index() {
         <Text className="mb-6 mt-2 text-center text-base text-gray-600">
           Confira links e mensagens antes de pagar ou clicar.
         </Text>
+
+        {offline ? (
+          <View testID="offline-banner" accessible accessibilityRole="alert" className="mb-4 rounded-lg bg-amber-50 p-3">
+            <Text className="text-base text-risk-attention">
+              Você está sem conexão com a internet. Conecte-se para verificar links e mensagens.
+            </Text>
+          </View>
+        ) : null}
 
         <TextInput
           testID="content-input"

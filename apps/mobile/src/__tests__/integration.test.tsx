@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { AnalyzeResponse } from '../types/api';
 import Index from '../app/index';
 
+jest.mock('expo-network', () => ({ useNetworkState: jest.fn(() => ({ isConnected: true })) }));
+
 const SECRET = 'minha-chave-pix-123@segredo.com';
 
 const okBody: AnalyzeResponse = {

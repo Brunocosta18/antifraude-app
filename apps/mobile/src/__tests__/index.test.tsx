@@ -12,6 +12,8 @@ jest.mock('../services/api', () => ({
 const { AppError } = jest.requireActual('../services/api') as typeof import('../services/api');
 const mockAnalyze = analyzeTarget as jest.Mock;
 
+jest.mock('expo-network', () => ({ useNetworkState: jest.fn(() => ({ isConnected: true })) }));
+
 const SECRET = 'minha-chave-pix-123@segredo.com';
 
 const okResponse: AnalyzeResponse = {
