@@ -1,0 +1,7 @@
+# Allowlist: tudo é ignorado, exceto o necessário para o build
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!src/

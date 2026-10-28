@@ -31,7 +31,7 @@ Sistema de detecção de fraudes, golpes e engenharia social focado no mercado b
 ---
 
 ## 🔵 Fase 4: Infraestrutura, CI/CD & Deploy ($0/mês)
-- [ ] **ANTIGOL-012**: Containerização com `Dockerfile` multi-stage otimizado e `docker-compose.yml`.
+- [x] **ANTIGOL-012**: Containerização com `Dockerfile` multi-stage otimizado e `docker-compose.yml`.
 - [ ] **ANTIGOL-013**: Configuração de esteira de CI/CD via **GitHub Actions** (run tests, typecheck e linter automatizados a cada PR/push).
 - [ ] **ANTIGOL-014**: Deploy da API em plataforma de hospedagem gratuita (Render / Fly.io) com variáveis de ambiente configuradas.
 - [ ] **ANTIGOL-015**: Deploy da interface Web/PWA na Vercel ou Netlify (Custo $0).

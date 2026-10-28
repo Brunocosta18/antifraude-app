@@ -47,6 +47,7 @@ Este documento é a referência principal para o assistente de IA e para a equip
   - ✅ *ANTIGOL-004* — `POST /api/v1/analyze` (`{type:'message'|'url', content}`, Zod em `src/api/schemas/analyze.ts`); erros padronizados em `src/api/errors.ts`. Contrato em `docs/API.md`.
   - ✅ *ANTIGOL-005* — Threat feed URLhaus (abuse.ch, `URLHAUS_AUTH_KEY`): porta `ThreatFeed` em `src/core/types.ts`, adapter em `src/adapters/urlhaus.ts`. Timeout ≤ 2s, `report.externalCheck` = `checked | unavailable | disabled`. Graceful degradation para regras locais em caso de falha.
   - ✅ *ANTIGOL-006* — Rate limit por IP em `POST /api/v1/analyze` (`@fastify/rate-limit`, `global: false`, MIT, $0): configurado via `RATE_LIMIT_MAX` (padrão 30) e `RATE_LIMIT_WINDOW_MS` (padrão 60000). Excedido → 429 `RATE_LIMIT_EXCEEDED` via `ApiError` + headers padrão `X-RateLimit-*`/`Retry-After`. Rota `/health` isenta.
+  - ✅ *ANTIGOL-012* — Containerização: `apps/api/Dockerfile` (3 stages `node:24-alpine`: build / deps prod / runtime), `.dockerignore` e `docker-compose.yml` na raiz. Comandos: `docker compose up --build` e `npm run docker:smoke` (health 200, usuário `node`, exit code 0 no stop). Padrões: contexto de build = raiz (código não foi movido); `.dockerignore` em modo allowlist (`*` + exceções); `USER node`; `CMD` em exec-form (`node dist/index.js`) para o SIGTERM chegar ao Node (graceful shutdown); `HOST=0.0.0.0` no container; `CORS_ORIGIN` explícito em produção (`*` é rejeitado); segredos (`URLHAUS_AUTH_KEY`) só em runtime, nunca em `ARG`/`ENV` da imagem; compose com `read_only`, `cap_drop: ALL` e `no-new-privileges`. Teste estático em `tests/infra/docker.test.ts`.
 - **Frontend / Mobile:** ✅ *ANTIGOL-007* — **Expo (SDK 58) + Expo Router + NativeWind v4 (Tailwind CSS v3)** em `apps/mobile/` (package.json próprio; testes com **jest-expo**, `npm test` dentro da pasta).
   - Rotas: `apps/mobile/src/app/` · Componentes: `src/components/` · Tipos do contrato da API: `src/types/api.ts` · Cliente HTTP: `src/services/api.ts`.
   - `api.ts`: `EXPO_PUBLIC_API_URL`, timeout de 10s (`AbortController`), `AppError` (`code`, `status`, `details`, `retryAfterSeconds`) com códigos do backend + `TIMEOUT | NETWORK_ERROR | INVALID_RESPONSE`; 429 → `RATE_LIMIT_EXCEEDED` lendo `Retry-After`. Nenhum `console.*` e nenhuma lib de analytics/rastreamento (LGPD).
@@ -71,6 +72,10 @@ antifraude-app/
 ├── .gitignore                  # Arquivos e pastas ignorados pelo Git
 ├── CLAUDE.md                   # Guia mestre da IA e regras do projeto
 ├── README.md                   # Apresentação do projeto para humanos
+├── .dockerignore               # Allowlist do contexto de build Docker
+├── docker-compose.yml          # Execução local da API em container
+├── apps/api/Dockerfile         # Imagem multi-stage da API (contexto = raiz)
+├── scripts/docker-smoke.mjs    # Smoke test da imagem (npm run docker:smoke)
 ├── docs/                       # Documentação centralizada
 │   ├── PRODUCT_SCOPE.md        # Escopo do MVP e regras de negócio
 │   ├── ARCHITECTURE.md         # Arquitetura detalhada do sistema
