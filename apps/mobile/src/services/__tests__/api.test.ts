@@ -1,4 +1,4 @@
-import { analyze, isAppError } from '../api';
+import { analyze, analyzeTarget, detectAnalyzeType, isAppError } from '../api';
 import type { AppError } from '../api';
 import type { AnalyzeResponse } from '../../types/api';
 
@@ -159,5 +159,30 @@ describe('analyze', () => {
       expect(err.message).not.toContain(SECRET);
       expect(JSON.stringify(err.details ?? [])).not.toContain(SECRET);
     }
+  });
+});
+
+describe('detectAnalyzeType', () => {
+  it.each(['https://x.com', 'HTTP://exemplo.com/a?b=1', 'banco-seguro.com.br/login', 'www.exemplo.com'])(
+    '%s -> url',
+    (input) => {
+      expect(detectAnalyzeType(input)).toBe('url');
+    },
+  );
+
+  it.each(['123.456.789-00', '+55 11 91234-5678', '11912345678', 'fulano@exemplo.com', 'clique aqui exemplo.com'])(
+    '%s -> message',
+    (input) => {
+      expect(detectAnalyzeType(input)).toBe('message');
+    },
+  );
+});
+
+describe('analyzeTarget', () => {
+  it('faz trim e envia type + content no corpo', async () => {
+    const fetchFn = fake(async () => jsonResponse(200, okBody));
+    await analyzeTarget('  exemplo.com/pagar  ', { fetchFn });
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ type: 'url', content: 'exemplo.com/pagar' });
   });
 });

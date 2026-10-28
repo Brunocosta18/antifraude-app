@@ -1,6 +1,7 @@
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
+  AnalyzeType,
   ApiErrorBody,
   ApiErrorCode,
   ApiErrorDetail,
@@ -132,4 +133,20 @@ export function analyze(input: AnalyzeRequest, options?: RequestOptions): Promis
     },
     options,
   );
+}
+
+const URL_SCHEME = /^https?:\/\//i;
+const URL_HOST = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?$/i;
+
+/** Um único token com cara de URL vai como 'url'; Pix, telefone, CPF e texto vão como 'message'. */
+export function detectAnalyzeType(content: string): AnalyzeType {
+  const trimmed = content.trim();
+  if (/\s/.test(trimmed)) return 'message';
+  if (URL_SCHEME.test(trimmed) || URL_HOST.test(trimmed)) return 'url';
+  return 'message';
+}
+
+export function analyzeTarget(content: string, options?: RequestOptions): Promise<AnalyzeResponse> {
+  const trimmed = content.trim();
+  return analyze({ type: detectAnalyzeType(trimmed), content: trimmed }, options);
 }
