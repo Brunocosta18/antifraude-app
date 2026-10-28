@@ -31,3 +31,18 @@ curl http://127.0.0.1:3000/health
 
 ## Variáveis de ambiente
 Veja [`.env.example`](.env.example). Destaque: `CORS_ORIGIN` aceita uma lista separada por vírgulas; `*` só é permitido fora de produção.
+
+## App mobile (Expo)
+O app fica em [`apps/mobile/`](apps/mobile) (Expo + Expo Router + NativeWind), com dependências próprias.
+
+```bash
+cd apps/mobile
+npm install
+cp .env.example .env      # EXPO_PUBLIC_API_URL aponta para o backend
+npx expo start            # a = Android, i = iOS, w = Web
+npm test                  # testes do cliente de API (jest-expo)
+```
+
+- **Emulador Android:** use `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000`. **Aparelho físico:** o IP da máquina na rede local.
+- **Expo Web:** inclua `http://localhost:8081` no `CORS_ORIGIN` do `.env` do backend.
+- Tudo em `EXPO_PUBLIC_*` vai para o bundle do app: nunca coloque segredos ali.

@@ -22,7 +22,7 @@ Sistema de detecção de fraudes, golpes e engenharia social focado no mercado b
 ---
 
 ## 🟡 Fase 3: Interface do Usuário — Frontend / Mobile App (Próximo Passo)
-- [ ] **ANTIGOL-007**: Setup da aplicação Web/PWA/Mobile com **React Native (Expo)** ou **Next.js** + Tailwind CSS.
+- [x] **ANTIGOL-007**: Setup da aplicação mobile/web com **Expo + Expo Router + NativeWind (Tailwind CSS v3)** em `apps/mobile/`, com cliente de API (`timeout`, `AppError`, `429`).
 - [ ] **ANTIGOL-008**: Construção da tela principal de análise (input para colar mensagens/links suspeitos e botão direto de verificação).
 - [ ] **ANTIGOL-009**: Tela de resultados intuitiva (card visual com nível de risco em verde/amarelo/vermelho, lista de sinais e conselhos práticos).
 - [ ] **ANTIGOL-010**: Integração do cliente com a API backend, tratando estado de carregamento, erros de rede e limite de requisições (`429`).
