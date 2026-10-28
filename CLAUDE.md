@@ -50,6 +50,7 @@ Este documento é a referência principal para o assistente de IA e para a equip
 - **Frontend / Mobile:** ✅ *ANTIGOL-007* — **Expo (SDK 58) + Expo Router + NativeWind v4 (Tailwind CSS v3)** em `apps/mobile/` (package.json próprio; testes com **jest-expo**, `npm test` dentro da pasta).
   - Rotas: `apps/mobile/src/app/` · Componentes: `src/components/` · Tipos do contrato da API: `src/types/api.ts` · Cliente HTTP: `src/services/api.ts`.
   - `api.ts`: `EXPO_PUBLIC_API_URL`, timeout de 10s (`AbortController`), `AppError` (`code`, `status`, `details`, `retryAfterSeconds`) com códigos do backend + `TIMEOUT | NETWORK_ERROR | INVALID_RESPONSE`; 429 → `RATE_LIMIT_EXCEEDED` lendo `Retry-After`. Nenhum `console.*` e nenhuma lib de analytics/rastreamento (LGPD).
+  - ✅ *ANTIGOL-008* — tela de análise em `src/app/index.tsx`; `analyzeTarget` com detecção automática url/message; testes de tela com RNTL (em `src/__tests__/`, fora de `src/app/` para não virarem rotas).
   - O `vitest.config.ts` da raiz restringe o Vitest do backend a `tests/`.
 - **Banco de Dados Local / Cache:** SQLite (local/dev) ou PostgreSQL (Free tier / Docker local).
 - **Inteligência de Ameaças (Free/Open):**
