@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { analyzeTarget } from '../services/api';
 import type { AnalyzeResponse } from '../types/api';
@@ -81,5 +81,63 @@ describe('tela de análise', () => {
     await typeAndSubmit();
     expect(await screen.findByText('Não foi possível concluir a verificação. Tente novamente.')).toBeTruthy();
     expect(screen.queryByText(new RegExp(SECRET))).toBeNull();
+  });
+
+  it('NETWORK_ERROR exibe a mensagem', async () => {
+    const msg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+    mockAnalyze.mockRejectedValue(new AppError('NETWORK_ERROR', msg));
+    await render(<Index />);
+    await typeAndSubmit();
+    expect(await screen.findByText(msg)).toBeTruthy();
+    expect(screen.getByTestId('submit-button')).toBeEnabled();
+  });
+
+  it('nova submissão limpa o erro anterior (error -> loading -> success)', async () => {
+    mockAnalyze.mockRejectedValueOnce(new AppError('TIMEOUT', 'A verificação demorou demais. Tente novamente.'));
+    await render(<Index />);
+    await typeAndSubmit();
+    expect(await screen.findByRole('alert')).toBeTruthy();
+
+    mockAnalyze.mockReturnValueOnce(new Promise(() => {}));
+    await fireEvent.press(screen.getByTestId('submit-button'));
+    expect(screen.getByTestId('loading-indicator')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('429 sem retryAfterSeconds não bloqueia o botão', async () => {
+    mockAnalyze.mockRejectedValue(new AppError('RATE_LIMIT_EXCEEDED', 'Aguarde um pouco e tente novamente.', 429));
+    await render(<Index />);
+    await typeAndSubmit();
+    expect(await screen.findByText('Aguarde um pouco e tente novamente.')).toBeTruthy();
+    expect(screen.queryByTestId('retry-countdown')).toBeNull();
+    expect(screen.getByTestId('submit-button')).toBeEnabled();
+  });
+
+  describe('bloqueio por 429 com Retry-After', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('desabilita o botão com contagem e reabilita ao chegar a 0', async () => {
+      const msg = 'Muitas verificações em pouco tempo. Aguarde 3 s e tente novamente.';
+      mockAnalyze.mockRejectedValue(new AppError('RATE_LIMIT_EXCEEDED', msg, 429, undefined, 3));
+      await render(<Index />);
+      await typeAndSubmit();
+
+      expect(await screen.findByText(msg)).toBeTruthy();
+      expect(screen.getByTestId('submit-button')).toBeDisabled();
+      expect(screen.getByTestId('retry-countdown')).toHaveTextContent('Tente novamente em 3 s');
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(screen.getByTestId('retry-countdown')).toHaveTextContent('Tente novamente em 2 s');
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByTestId('retry-countdown')).toBeNull();
+      expect(screen.getByTestId('submit-button')).toBeEnabled();
+      expect(screen.getByText('Verificar')).toBeTruthy();
+    });
   });
 });

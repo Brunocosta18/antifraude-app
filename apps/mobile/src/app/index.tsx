@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,6 +17,12 @@ import type { AnalyzeResponse } from '../types/api';
 const MAX_LENGTH = 5000;
 const GENERIC_ERROR = 'Não foi possível concluir a verificação. Tente novamente.';
 
+type ScreenState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; response: AnalyzeResponse; analyzedAt: string }
+  | { status: 'error'; message: string };
+
 /** Nunca ecoa o conteúdo digitado pelo usuário (LGPD). */
 function friendlyError(e: unknown): string {
   return isAppError(e) ? e.message : GENERIC_ERROR;
@@ -24,26 +30,30 @@ function friendlyError(e: unknown): string {
 
 export default function Index() {
   const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalyzeResponse | null>(null);
-  const [analyzedAt, setAnalyzedAt] = useState<string>();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [state, setState] = useState<ScreenState>({ status: 'idle' });
+  const [retryIn, setRetryIn] = useState(0);
 
-  const disabled = loading || content.trim().length === 0;
+  const loading = state.status === 'loading';
+  const disabled = loading || retryIn > 0 || content.trim().length === 0;
+  const counting = retryIn > 0;
+
+  useEffect(() => {
+    if (!counting) return;
+    const timer = setInterval(() => setRetryIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [counting]);
 
   async function onSubmit() {
     if (disabled) return;
-    setErrorMessage(null);
-    setResult(null);
-    setLoading(true);
+    setState({ status: 'loading' });
     try {
       const response = await analyzeTarget(content);
-      setResult(response);
-      setAnalyzedAt(new Date().toISOString());
+      setState({ status: 'success', response, analyzedAt: new Date().toISOString() });
     } catch (e) {
-      setErrorMessage(friendlyError(e));
-    } finally {
-      setLoading(false);
+      setState({ status: 'error', message: friendlyError(e) });
+      if (isAppError(e) && e.code === 'RATE_LIMIT_EXCEEDED' && e.retryAfterSeconds && e.retryAfterSeconds > 0) {
+        setRetryIn(e.retryAfterSeconds);
+      }
     }
   }
 
@@ -86,19 +96,23 @@ export default function Index() {
               <ActivityIndicator testID="loading-indicator" color="#ffffff" />
               <Text className="ml-2 text-base font-semibold text-white">Verificando…</Text>
             </>
+          ) : counting ? (
+            <Text testID="retry-countdown" className="text-base font-semibold text-white">
+              Tente novamente em {retryIn} s
+            </Text>
           ) : (
             <Text className="text-base font-semibold text-white">Verificar</Text>
           )}
         </Pressable>
 
-        {errorMessage ? (
+        {state.status === 'error' ? (
           <View accessible accessibilityRole="alert" className="mt-4 rounded-lg bg-red-50 p-3">
-            <Text className="text-base text-risk-high">{errorMessage}</Text>
+            <Text className="text-base text-risk-high">{state.message}</Text>
           </View>
         ) : null}
 
-        {result ? (
-          <RiskCard report={result.report} analyzedAt={analyzedAt} />
+        {state.status === 'success' ? (
+          <RiskCard report={state.response.report} analyzedAt={state.analyzedAt} />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
