@@ -11,16 +11,11 @@ import {
 } from 'react-native';
 
 import { analyzeTarget, isAppError } from '../services/api';
-import type { AnalyzeResponse, RiskLevel } from '../types/api';
+import { RiskCard } from '../components/RiskCard';
+import type { AnalyzeResponse } from '../types/api';
 
 const MAX_LENGTH = 5000;
 const GENERIC_ERROR = 'Não foi possível concluir a verificação. Tente novamente.';
-
-const LEVEL_TEXT_CLASS: Record<RiskLevel, string> = {
-  HIGH_RISK: 'text-risk-high',
-  NEEDS_ATTENTION: 'text-risk-attention',
-  NO_KNOWN_INDICATORS: 'text-risk-none',
-};
 
 /** Nunca ecoa o conteúdo digitado pelo usuário (LGPD). */
 function friendlyError(e: unknown): string {
@@ -31,6 +26,7 @@ export default function Index() {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [analyzedAt, setAnalyzedAt] = useState<string>();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const disabled = loading || content.trim().length === 0;
@@ -41,7 +37,9 @@ export default function Index() {
     setResult(null);
     setLoading(true);
     try {
-      setResult(await analyzeTarget(content));
+      const response = await analyzeTarget(content);
+      setResult(response);
+      setAnalyzedAt(new Date().toISOString());
     } catch (e) {
       setErrorMessage(friendlyError(e));
     } finally {
@@ -100,12 +98,7 @@ export default function Index() {
         ) : null}
 
         {result ? (
-          <View className="mt-4 rounded-lg border border-gray-200 p-3">
-            <Text testID="result-label" className={`text-lg font-bold ${LEVEL_TEXT_CLASS[result.report.level]}`}>
-              {result.report.label}
-            </Text>
-            <Text className="mt-2 text-sm text-gray-600">{result.report.disclaimer}</Text>
-          </View>
+          <RiskCard report={result.report} analyzedAt={analyzedAt} />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>

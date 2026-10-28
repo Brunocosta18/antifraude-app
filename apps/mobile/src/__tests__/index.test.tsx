@@ -55,6 +55,7 @@ describe('tela de análise', () => {
     await render(<Index />);
     await typeAndSubmit();
     expect(await screen.findByText(okResponse.report.label)).toBeTruthy();
+    expect(screen.getByTestId('analyzed-at')).toBeTruthy();
     expect(mockAnalyze).toHaveBeenCalledWith(SECRET);
   });
 
