@@ -57,6 +57,7 @@ Este documento é a referência principal para o assistente de IA e para a equip
   - ✅ *ANTIGOL-009* — `RiskCard` em `src/components/RiskCard.tsx` recebe `AnalysisReport` + `analyzedAt?` (ISO, horário local gerado no cliente; fora do contrato da API). Cores por `level` com classes literais (`text-/border-risk-none|attention|high`); seções vazias são omitidas; todo texto vem do relatório da API, nunca do input. Testes em `src/__tests__/RiskCard.test.tsx`.
   - ✅ *ANTIGOL-010* — `src/app/index.tsx` usa estado explícito `idle | loading | success | error`. No 429 com `Retry-After` > 0 o botão fica bloqueado com contagem regressiva (`Tente novamente em N s`, testID `retry-countdown`); sem `Retry-After`, apenas a mensagem. Teste de integração em `src/__tests__/integration.test.tsx` (tela + `api.ts` real com `fetch` simulado: NETWORK_ERROR, TIMEOUT, 429, 200 e LGPD).
   - ✅ *ANTIGOL-011* — PWA sem Service Worker: manifest em `public/manifest.json` (+ ícones 192/512 em `public/icons/`) e `src/app/+html.tsx` (theme-color `#208AEF`, `display: standalone`, `lang pt-BR`; as chaves PWA de `app.json > web` são ignoradas pelo Metro). Modo offline via `expo-network` `useNetworkState`: `isConnected === false` mostra `offline-banner` e desabilita o botão (nenhuma requisição é enviada); `undefined` conta como online. Testes em `src/__tests__/offline.test.tsx` e `pwa.test.ts`.
+  - ✅ *ANTIGOL-015* — Deploy da PWA na **Vercel Hobby** ($0, sem cartão) como site estático: `apps/mobile/app.json` com `web.output: "static"` (o modo `server` exigiria adapter) e script `export:web` (`expo export -p web` → `apps/mobile/dist/`, no `.gitignore`). `apps/mobile/vercel.json` (Root Directory = `apps/mobile` no painel; `framework: null`, `buildCommand: npm run export:web`, `outputDirectory: dist`) com rewrite de SPA para `/index.html` e headers: segurança em `/(.*)` (`nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, HSTS), `application/manifest+json` em `/manifest.json` e cache `immutable` em `/_expo/static/`. `EXPO_PUBLIC_API_URL` só no painel (embutida no bundle **no build**; mudar exige redeploy; nunca segredo) e `CORS_ORIGIN` do Render = domínio da Vercel (sem `*`). LGPD: Web Analytics/Speed Insights desligados, sem `@vercel/*` nem chave `env` no `vercel.json`, sem função serverless (conteúdo só no corpo do POST). Guia em `docs/DEPLOY.md` (cold start do Render aparece como timeout de 10s; deploy da Vercel não espera o CI). Teste estático em `tests/infra/vercel.test.ts`.
   - O `vitest.config.ts` da raiz restringe o Vitest do backend a `tests/`.
 - **Banco de Dados Local / Cache:** SQLite (local/dev) ou PostgreSQL (Free tier / Docker local).
 - **Inteligência de Ameaças (Free/Open):**
@@ -80,11 +81,12 @@ antifraude-app/
 ├── apps/api/Dockerfile         # Imagem multi-stage da API (contexto = raiz)
 ├── scripts/docker-smoke.mjs    # Smoke test da imagem (npm run docker:smoke)
 ├── render.yaml                 # Blueprint de deploy no Render Free (ANTIGOL-014)
+├── apps/mobile/vercel.json     # Deploy estático da PWA na Vercel Hobby (ANTIGOL-015)
 ├── docs/                       # Documentação centralizada
 │   ├── PRODUCT_SCOPE.md        # Escopo do MVP e regras de negócio
 │   ├── ARCHITECTURE.md         # Arquitetura detalhada do sistema
 │   ├── API.md                  # Contrato da API e descrições de endpoints
-│   ├── DEPLOY.md               # Guia de deploy no Render (Free, $0)
+│   ├── DEPLOY.md               # Guia de deploy: Render (API) + Vercel (PWA), $0
 │   └── ROADMAP.md              # Backlog, épicos e tarefas (ANTIGOL-001 a 015+)
 ├── src/                        # Código-fonte da aplicação
 │   ├── index.ts                # Ponto de entrada / Inicialização do servidor

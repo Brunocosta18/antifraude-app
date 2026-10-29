@@ -1,4 +1,6 @@
-# Deploy da API no Render (plano Free, $0, sem cartão)
+# Deploy (API no Render + PWA na Vercel)
+
+## API no Render (plano Free, $0, sem cartão)
 
 A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repositório) descrito pelo Blueprint [`render.yaml`](../render.yaml).
 
@@ -58,3 +60,43 @@ curl -i -X POST https://<servico>.onrender.com/api/v1/analyze \
 
 ## Rollback
 No painel do serviço, abra **Events** (ou **Deploys**) e use **Rollback** para o deploy anterior.
+
+## PWA na Vercel (Hobby, $0)
+
+A interface Web/PWA (`apps/mobile/`) é publicada como site estático (`expo export -p web`, com `web.output: "static"` no `app.json`) servido pela CDN da Vercel, conforme [`apps/mobile/vercel.json`](../apps/mobile/vercel.json). Não há função serverless: o conteúdo analisado vai no corpo do `POST` para a API (nunca na URL) e os logs de borda veem só caminhos estáticos.
+
+### Passo a passo
+1. No painel da Vercel (conta Hobby gratuita, sem cartão): **Add New** > **Project** e importe o repositório.
+2. Em **Root Directory**, informe `apps/mobile`. Framework: **Other** (o `vercel.json` define instalação, build e saída).
+3. Em **Environment Variables** (Production e Preview), crie `EXPO_PUBLIC_API_URL=https://<servico>.onrender.com`.
+   - O valor é embutido no bundle **no build**: mudar o valor exige novo deploy.
+   - É público: nunca coloque segredo nessa variável.
+4. Clique em **Deploy**.
+
+### Ligação com o Render
+No painel do Render, defina `CORS_ORIGIN` com o domínio da Vercel (ex.: `https://<projeto>.vercel.app`), sem `*`. Sem isso o navegador bloqueia as chamadas à API.
+
+### LGPD
+- Mantenha **Web Analytics** e **Speed Insights** da Vercel **desligados** (não instale `@vercel/analytics` nem `@vercel/speed-insights`).
+- O texto/URL analisado vai no corpo do `POST`, nunca na URL; não há função serverless nem runtime logs de servidor.
+
+### Limitações
+- O cold start da API no Render Free aparece como timeout de 10 s na primeira chamada após a hibernação; tentar de novo resolve.
+- O deploy da Vercel **não espera o CI** do GitHub Actions.
+
+### Validação pós-deploy
+Troque `<projeto>` pelo nome do projeto na Vercel.
+
+```bash
+curl -I https://<projeto>.vercel.app/
+curl -I https://<projeto>.vercel.app/manifest.json
+```
+
+1. `/` responde 200 com `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy: no-referrer` e `Strict-Transport-Security`.
+2. `/manifest.json` responde com `Content-Type: application/manifest+json`.
+3. A PWA pode ser instalada (opção "Instalar app" no navegador).
+4. Uma análise real conclui sem erro de CORS.
+5. Abrir `/rota-inexistente` carrega o app (fallback de SPA).
+
+### Rollback
+Em **Deployments**, escolha o deploy anterior e use **Promote to Production**.
