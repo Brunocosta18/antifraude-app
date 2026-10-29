@@ -15,6 +15,7 @@ services:
       - { key: LOG_LEVEL, value: info }
       - { key: TRUST_PROXY, value: "1" } # 1 salto: IP real do cliente vem do X-Forwarded-For do Render
       - { key: THREAT_FEED_TIMEOUT_MS, value: "2000" }
+      - { key: PHISHING_DB_ENABLED, value: "true" } # lista pública Phishing.Database (ANTIGOL-016), baixada pelo servidor
       - { key: RATE_LIMIT_MAX, value: "30" }
       - { key: RATE_LIMIT_WINDOW_MS, value: "60000" }
       - { key: CORS_ORIGIN, sync: false } # preenchido no painel (origem da PWA, ANTIGOL-015)

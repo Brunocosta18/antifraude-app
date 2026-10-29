@@ -29,6 +29,8 @@ A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repo
 | `LOG_LEVEL` | `info` | `fatal` \| `error` \| `warn` \| `info` \| `debug` \| `trace` \| `silent` |
 | `TRUST_PROXY` | `1` | `true`, `false` ou inteiro de 1 a 10 (padrão `false`) |
 | `THREAT_FEED_TIMEOUT_MS` | `2000` | inteiro de 100 a 2000 |
+| `PHISHING_DB_ENABLED` | `true` (já no `render.yaml`) | `true` \| `false` (padrão `false`) |
+| `PHISHING_DB_REFRESH_MS` | padrão `21600000` (6 h) | inteiro de 3600000 (1 h) a 86400000 (24 h) |
 | `RATE_LIMIT_MAX` | `30` | inteiro de 1 a 10000 |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | inteiro de 1000 a 3600000 |
 | `CORS_ORIGIN` | preencher no painel | lista separada por vírgula; sem `*` em produção |
@@ -39,6 +41,7 @@ A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repo
 ## Limitações do plano Free
 - Hiberna após 15 min sem tráfego; a primeira requisição depois disso sofre cold start de ~30 a 60 s.
 - 750 horas de instância por mês.
+- Feed Phishing.Database (ANTIGOL-016): a lista (~11 MB) é baixada a cada restart e mantida em memória (algumas dezenas de MB a mais, dentro dos 512 MB do Free). Até o download terminar (e se ele falhar) o `externalCheck` fica `unavailable` e a análise segue só com as regras locais.
 - Os contadores do rate limit ficam em memória e zeram a cada restart/deploy.
 - As flags `read_only`, `cap_drop` e `no-new-privileges` do `docker-compose.yml` não existem no Render; o `USER node` do Dockerfile continua valendo.
 

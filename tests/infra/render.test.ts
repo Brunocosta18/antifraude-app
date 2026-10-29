@@ -32,6 +32,10 @@ describe('render.yaml', () => {
     expect(render).toMatch(/key:\s*URLHAUS_AUTH_KEY,\s*sync:\s*false/);
   });
 
+  it('liga o feed Phishing.Database (sem segredo)', () => {
+    expect(render).toMatch(/key:\s*PHISHING_DB_ENABLED,\s*value:\s*"true"/);
+  });
+
   it('não versiona segredo nem CORS aberto', () => {
     expect(render).not.toMatch(/key:\s*CORS_ORIGIN,\s*value/);
     expect(render).not.toMatch(/key:\s*URLHAUS_AUTH_KEY,\s*value/);

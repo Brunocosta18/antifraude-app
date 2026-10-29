@@ -5,7 +5,7 @@ import Index from '../app/index';
 
 jest.mock('expo-network', () => ({ useNetworkState: jest.fn(() => ({ isConnected: true })) }));
 
-const SECRET = 'minha-chave-pix-123@segredo.com';
+const SECRET = 'texto privado do usuario 123 segredo';
 
 const okBody: AnalyzeResponse = {
   type: 'message',

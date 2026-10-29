@@ -1,10 +1,11 @@
-import { getDomain } from 'tldts';
 import { z } from 'zod';
 
-import { findOfficialBrand } from '../core/domain/brands.js';
 import { SEVERITY_WEIGHTS } from '../core/risk/risk-scorer.js';
 import type { ExternalCheckStatus, Severity, Signal, ThreatFeed } from '../core/types.js';
 import { normalizeUrl, type NormalizedUrl } from '../utils/url.js';
+import { FeedFailure, isTrustedHost, readLimitedText, type FeedLogger } from './shared.js';
+
+export type { FeedLogger, ThreatFeedFailureReason } from './shared.js';
 
 /**
  * Adaptador do URLhaus (abuse.ch, gratuito com Auth-Key). Só soma `Signal[]` ao scorer.
@@ -17,25 +18,6 @@ import { normalizeUrl, type NormalizedUrl } from '../utils/url.js';
 const URLHAUS_HOST_ENDPOINT = 'https://urlhaus-api.abuse.ch/v1/host/';
 const MAX_HOSTS_PER_ANALYSIS = 3;
 const MAX_RESPONSE_BYTES = 512 * 1024;
-
-/** Plataformas legítimas que hospedam conteúdo de terceiros: host listado ali não condena o domínio todo. */
-const SHARED_PLATFORM_DOMAINS: ReadonlySet<string> = new Set([
-  'github.com',
-  'githubusercontent.com',
-  'google.com',
-  'googleusercontent.com',
-  'dropbox.com',
-  'onedrive.live.com',
-  '1drv.ms',
-  'discord.com',
-  'discordapp.com',
-]);
-
-export type ThreatFeedFailureReason = 'timeout' | 'network' | 'http_status' | 'invalid_response' | 'too_large';
-
-export interface FeedLogger {
-  warn(obj: { feed: 'urlhaus'; reason: ThreatFeedFailureReason; httpStatus?: number }): void;
-}
 
 export interface UrlhausFeedOptions {
   authKey: string;
@@ -53,15 +35,6 @@ const urlhausResponseSchema = z.object({
 });
 
 type UrlhausResponse = z.infer<typeof urlhausResponseSchema>;
-
-class FeedFailure extends Error {
-  constructor(
-    readonly reason: ThreatFeedFailureReason,
-    readonly httpStatus?: number,
-  ) {
-    super(reason);
-  }
-}
 
 /** Feed desligado (sem chave): não consulta nada. */
 export const disabledThreatFeed: ThreatFeed = {
@@ -96,31 +69,6 @@ const HOST_ONLINE = signal(
   'Evite abrir links deste site e não baixe arquivos dele.',
 );
 
-function isTrustedHost(hostname: string): boolean {
-  const registrable = getDomain(hostname);
-  if (registrable !== null && SHARED_PLATFORM_DOMAINS.has(registrable)) return true;
-  return findOfficialBrand(hostname) !== null;
-}
-
-/** Lê o corpo com corte em 512 KB, sem confiar em Content-Length. */
-async function readLimitedText(response: Response): Promise<string> {
-  if (response.body === null) return '';
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined);
-      throw new FeedFailure('too_large');
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks).toString('utf8');
-}
-
 async function queryHost(
   hostname: string,
   authKey: string,
@@ -141,7 +89,7 @@ async function queryHost(
       await response.body?.cancel().catch(() => undefined);
       throw new FeedFailure('http_status', response.status);
     }
-    text = await readLimitedText(response);
+    text = await readLimitedText(response, MAX_RESPONSE_BYTES);
   } catch (error) {
     if (error instanceof FeedFailure) throw error;
     throw new FeedFailure(signal.aborted ? 'timeout' : 'network');

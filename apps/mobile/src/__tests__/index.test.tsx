@@ -14,7 +14,7 @@ const mockAnalyze = analyzeTarget as jest.Mock;
 
 jest.mock('expo-network', () => ({ useNetworkState: jest.fn(() => ({ isConnected: true })) }));
 
-const SECRET = 'minha-chave-pix-123@segredo.com';
+const SECRET = 'texto privado do usuario 123 segredo';
 
 const okResponse: AnalyzeResponse = {
   type: 'url',
@@ -140,6 +140,42 @@ describe('tela de análise', () => {
       expect(screen.queryByTestId('retry-countdown')).toBeNull();
       expect(screen.getByTestId('submit-button')).toBeEnabled();
       expect(screen.getByText('Verificar')).toBeTruthy();
+    });
+  });
+
+  describe('chave Pix (ANTIGOL-016)', () => {
+    it('CPF inválido mostra o feedback, desabilita o botão e não chama a API', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch');
+      await render(<Index />);
+      await fireEvent.changeText(screen.getByTestId('content-input'), '111.111.111-11');
+      expect(screen.getByTestId('pix-feedback')).toBeTruthy();
+      expect(screen.getByTestId('pix-status-invalid')).toBeTruthy();
+      expect(screen.getByTestId('submit-button')).toBeDisabled();
+      await fireEvent.press(screen.getByTestId('submit-button'));
+      expect(mockAnalyze).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it('o feedback nunca ecoa a chave digitada', async () => {
+      await render(<Index />);
+      await fireEvent.changeText(screen.getByTestId('content-input'), 'suporte.nubank@gmail.com');
+      expect(screen.getByTestId('pix-status-suspicious')).toBeTruthy();
+      expect(screen.queryByText(/nubank|gmail|suporte/i)).toBeNull();
+    });
+
+    it('texto comum e link seguem o fluxo normal (sem feedback, botão habilitado)', async () => {
+      await render(<Index />);
+      await fireEvent.changeText(screen.getByTestId('content-input'), 'https://exemplo.com.br/pagar');
+      expect(screen.queryByTestId('pix-feedback')).toBeNull();
+      expect(screen.getByTestId('submit-button')).toBeEnabled();
+    });
+
+    it('apagar a chave remove o feedback', async () => {
+      await render(<Index />);
+      await fireEvent.changeText(screen.getByTestId('content-input'), '111.111.111-11');
+      await fireEvent.changeText(screen.getByTestId('content-input'), '');
+      expect(screen.queryByTestId('pix-feedback')).toBeNull();
     });
   });
 });

@@ -13,7 +13,7 @@ jest.mock('../services/api', () => ({
 const mockNetwork = useNetworkState as jest.Mock;
 const mockAnalyze = analyzeTarget as jest.Mock;
 
-const SECRET = 'minha-chave-pix-123@segredo.com';
+const SECRET = 'texto privado do usuario 123 segredo';
 const OFFLINE_MESSAGE = 'Você está sem conexão com a internet. Conecte-se para verificar links e mensagens.';
 
 beforeEach(() => {
@@ -69,6 +69,14 @@ describe('modo offline', () => {
     await fireEvent.changeText(screen.getByTestId('content-input'), SECRET);
     await fireEvent.press(screen.getByTestId('submit-button'));
     expect(screen.queryByText(new RegExp(SECRET))).toBeNull();
+    expect(screen.getByTestId('offline-banner')).toBeTruthy();
+  });
+
+  it('offline: o feedback da chave Pix aparece (validação local)', async () => {
+    mockNetwork.mockReturnValue({ isConnected: false });
+    await render(<Index />);
+    await fireEvent.changeText(screen.getByTestId('content-input'), '111.111.111-11');
+    expect(screen.getByTestId('pix-feedback')).toBeTruthy();
     expect(screen.getByTestId('offline-banner')).toBeTruthy();
   });
 });

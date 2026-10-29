@@ -27,13 +27,13 @@ Limites: mensagem até **5000** caracteres, URL até **2048** caracteres, corpo 
 
 `{ "type", "report" }`. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice`, `disclaimer` e `externalCheck`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
 
-`externalCheck` informa a consulta à fonte externa de ameaças (URLhaus, abuse.ch):
+`externalCheck` informa a consulta à fonte externa de ameaças (URLhaus, abuse.ch, e Phishing.Database). Com mais de um feed ativo, o valor é o pior caso: qualquer feed `unavailable` → `unavailable`; senão algum `checked` → `checked`; senão `disabled`:
 
 | Valor | Significado |
 |---|---|
 | `checked` | consultada com sucesso (sem sinais = nada listado) |
 | `unavailable` | falhou ou passou de 2 s; o resultado vem só das regras locais (e das consultas que deram certo) |
-| `disabled` | sem `URLHAUS_AUTH_KEY` configurada; análise apenas local |
+| `disabled` | nenhum feed ligado (sem `URLHAUS_AUTH_KEY` e com `PHISHING_DB_ENABLED=false`); análise apenas local |
 
 Sinais da fonte externa (categoria `threat_intel`):
 
@@ -41,6 +41,7 @@ Sinais da fonte externa (categoria `threat_intel`):
 |---|---|---|
 | `TI-URLHAUS-URL` | o link exato está listado no URLhaus | `critical` se ativo, `high` se inativo |
 | `TI-URLHAUS-HOST` | o site tem link ativo listado, sem match exato (ignorado para plataformas compartilhadas como github.com ou drive.google.com e para marcas oficiais) | `high` |
+| `TI-PHISHDB-DOMAIN` | o domínio (ou um domínio pai) consta na lista Phishing.Database, consultada em memória no servidor (ignorado para plataformas compartilhadas e marcas oficiais) | `high` |
 
 Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNOWN_INDICATORS` (Nenhum Indicador Conhecido Encontrado). O app nunca afirma que algo é "100% seguro".
 

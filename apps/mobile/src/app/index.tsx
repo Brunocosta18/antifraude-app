@@ -1,5 +1,5 @@
 import { useNetworkState } from 'expo-network';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 
 import { analyzeTarget, isAppError } from '../services/api';
+import { PixKeyFeedback } from '../components/PixKeyFeedback';
 import { RiskCard } from '../components/RiskCard';
 import type { AnalyzeResponse } from '../types/api';
+import { validatePixKey } from '../utils/pix';
 
 const MAX_LENGTH = 5000;
 const GENERIC_ERROR = 'Não foi possível concluir a verificação. Tente novamente.';
@@ -36,7 +38,9 @@ export default function Index() {
 
   const offline = useNetworkState().isConnected === false;
   const loading = state.status === 'loading';
-  const disabled = loading || offline || retryIn > 0 || content.trim().length === 0;
+  // Chave Pix é validada só no aparelho: nunca vai para a API (LGPD).
+  const pixCheck = useMemo(() => validatePixKey(content), [content]);
+  const disabled = loading || offline || retryIn > 0 || content.trim().length === 0 || pixCheck !== null;
   const counting = retryIn > 0;
 
   useEffect(() => {
@@ -89,6 +93,8 @@ export default function Index() {
           onChangeText={setContent}
           editable={!loading}
         />
+
+        {pixCheck !== null ? <PixKeyFeedback check={pixCheck} /> : null}
 
         <Pressable
           testID="submit-button"

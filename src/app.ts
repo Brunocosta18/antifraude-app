@@ -6,6 +6,8 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import { errorHandler, notFoundHandler } from './api/errors.js';
 import { analyzeRoutes } from './api/routes/analyze.js';
 import { healthRoutes } from './api/routes/health.js';
+import { combineFeeds } from './adapters/composite-feed.js';
+import { createPhishingDatabaseFeed, PHISHING_DB_LIST_URL } from './adapters/phishing-database.js';
 import { createUrlhausFeed, disabledThreatFeed } from './adapters/urlhaus.js';
 import type { AppConfig } from './config/env.js';
 import type { ThreatFeed } from './core/types.js';
@@ -55,17 +57,28 @@ function trustProxyOption(trustProxy: boolean | number): boolean | ((address: st
 export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: loggerOptions(config), trustProxy: trustProxyOption(config.trustProxy) });
 
-  const threatFeed =
-    deps.threatFeed ??
-    (config.urlhausAuthKey === null
-      ? disabledThreatFeed
-      : createUrlhausFeed({
-          authKey: config.urlhausAuthKey,
-          timeoutMs: config.threatFeedTimeoutMs,
-          logger: app.log.child({ component: 'threat-feed' }),
-        }));
-  if (deps.threatFeed === undefined && config.urlhausAuthKey === null) {
-    app.log.info('Threat feed URLhaus desligado (sem URLHAUS_AUTH_KEY): análise apenas local');
+  let threatFeed = deps.threatFeed ?? disabledThreatFeed;
+  if (deps.threatFeed === undefined) {
+    const feedLogger = app.log.child({ component: 'threat-feed' });
+    const feeds: ThreatFeed[] = [];
+    if (config.urlhausAuthKey === null) {
+      app.log.info('Threat feed URLhaus desligado (sem URLHAUS_AUTH_KEY): análise apenas local');
+    } else {
+      feeds.push(
+        createUrlhausFeed({ authKey: config.urlhausAuthKey, timeoutMs: config.threatFeedTimeoutMs, logger: feedLogger }),
+      );
+    }
+    if (config.phishingDbEnabled) {
+      const phishingDb = createPhishingDatabaseFeed({
+        listUrl: PHISHING_DB_LIST_URL,
+        refreshMs: config.phishingDbRefreshMs,
+        logger: feedLogger,
+      });
+      phishingDb.start(); // download em segundo plano; até concluir, o feed responde `unavailable`
+      app.addHook('onClose', async () => phishingDb.stop());
+      feeds.push(phishingDb);
+    }
+    if (feeds.length > 0) threatFeed = combineFeeds(feeds);
   }
 
   await app.register(helmet);

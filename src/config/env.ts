@@ -23,6 +23,12 @@ const envSchema = z
       .optional()
       .transform((key) => (key ? key : null)),
     THREAT_FEED_TIMEOUT_MS: z.coerce.number().int().min(100).max(2000).default(2000),
+    // Lista pública de phishing baixada pelo servidor (sem chave). Desligada por padrão: testes e CI nunca usam a rede.
+    PHISHING_DB_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    PHISHING_DB_REFRESH_MS: z.coerce.number().int().min(3_600_000).max(86_400_000).default(21_600_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10000).default(30),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
     // Atrás de proxy reverso (ex.: Render): 'true' | 'false' | nº de saltos (1 a 10). Sem isso o rate limit enxerga só o IP do proxy.
@@ -63,6 +69,9 @@ export interface AppConfig {
   /** `null` = feed URLhaus desligado (análise só local). */
   readonly urlhausAuthKey: string | null;
   readonly threatFeedTimeoutMs: number;
+  /** Feed Phishing.Database ligado (a lista é baixada pelo servidor e consultada em memória). */
+  readonly phishingDbEnabled: boolean;
+  readonly phishingDbRefreshMs: number;
   /** Máximo de requisições por IP em `POST /analyze` dentro da janela. */
   readonly rateLimitMax: number;
   readonly rateLimitWindowMs: number;
@@ -107,6 +116,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     CORS_ORIGIN,
     URLHAUS_AUTH_KEY,
     THREAT_FEED_TIMEOUT_MS,
+    PHISHING_DB_ENABLED,
+    PHISHING_DB_REFRESH_MS,
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
     TRUST_PROXY,
@@ -120,6 +131,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     appVersion: readAppVersion(),
     urlhausAuthKey: URLHAUS_AUTH_KEY,
     threatFeedTimeoutMs: THREAT_FEED_TIMEOUT_MS,
+    phishingDbEnabled: PHISHING_DB_ENABLED,
+    phishingDbRefreshMs: PHISHING_DB_REFRESH_MS,
     rateLimitMax: RATE_LIMIT_MAX,
     rateLimitWindowMs: RATE_LIMIT_WINDOW_MS,
     trustProxy: TRUST_PROXY,

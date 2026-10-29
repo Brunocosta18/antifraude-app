@@ -106,4 +106,32 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ TRUST_PROXY: value })).toThrow(/TRUST_PROXY/);
     });
   });
+
+  describe('phishing database', () => {
+    it('padrões: desligado e refresh de 6 h', () => {
+      const config = loadConfig({});
+      expect(config.phishingDbEnabled).toBe(false);
+      expect(config.phishingDbRefreshMs).toBe(6 * 3_600_000);
+    });
+
+    it.each([
+      ['true', true],
+      ['false', false],
+    ])('lê PHISHING_DB_ENABLED=%s', (value, esperado) => {
+      expect(loadConfig({ PHISHING_DB_ENABLED: value }).phishingDbEnabled).toBe(esperado);
+    });
+
+    it.each(['sim', '1', 'TRUE '])('rejeita PHISHING_DB_ENABLED inválido (%s)', (value) => {
+      expect(() => loadConfig({ PHISHING_DB_ENABLED: value })).toThrow(/PHISHING_DB_ENABLED/);
+    });
+
+    it('aceita os limites de PHISHING_DB_REFRESH_MS (1 h a 24 h)', () => {
+      expect(loadConfig({ PHISHING_DB_REFRESH_MS: '3600000' }).phishingDbRefreshMs).toBe(3_600_000);
+      expect(loadConfig({ PHISHING_DB_REFRESH_MS: '86400000' }).phishingDbRefreshMs).toBe(86_400_000);
+    });
+
+    it.each(['3599999', '86400001', 'abc'])('rejeita PHISHING_DB_REFRESH_MS inválido (%s)', (value) => {
+      expect(() => loadConfig({ PHISHING_DB_REFRESH_MS: value })).toThrow(/PHISHING_DB_REFRESH_MS/);
+    });
+  });
 });
