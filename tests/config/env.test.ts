@@ -87,4 +87,23 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ RATE_LIMIT_WINDOW_MS: value })).toThrow(/RATE_LIMIT_WINDOW_MS/);
     });
   });
+
+  describe('trust proxy', () => {
+    it('padrão é false', () => {
+      expect(loadConfig({}).trustProxy).toBe(false);
+    });
+
+    it.each([
+      ['true', true],
+      ['false', false],
+      ['1', 1],
+      ['10', 10],
+    ])('lê TRUST_PROXY=%s', (value, esperado) => {
+      expect(loadConfig({ TRUST_PROXY: value }).trustProxy).toBe(esperado);
+    });
+
+    it.each(['abc', '0', '11', '1.5'])('rejeita TRUST_PROXY inválido (%s)', (value) => {
+      expect(() => loadConfig({ TRUST_PROXY: value })).toThrow(/TRUST_PROXY/);
+    });
+  });
 });

@@ -43,9 +43,17 @@ function loggerOptions(config: AppConfig): FastifyServerOptions['logger'] {
   };
 }
 
+/**
+ * O Fastify 5 ignora `trustProxy` numérico (falha fechada), então o nº de saltos vira função:
+ * confia nos N saltos a partir do socket, e o IP do cliente passa a ser a entrada seguinte do X-Forwarded-For.
+ */
+function trustProxyOption(trustProxy: boolean | number): boolean | ((address: string, hop: number) => boolean) {
+  return typeof trustProxy === 'number' ? (_address, hop) => hop < trustProxy : trustProxy;
+}
+
 /** Fábrica da aplicação: monta plugins e rotas sem abrir porta (facilita testes). */
 export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed } = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: loggerOptions(config) });
+  const app = Fastify({ logger: loggerOptions(config), trustProxy: trustProxyOption(config.trustProxy) });
 
   const threatFeed =
     deps.threatFeed ??

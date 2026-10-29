@@ -25,6 +25,13 @@ const envSchema = z
     THREAT_FEED_TIMEOUT_MS: z.coerce.number().int().min(100).max(2000).default(2000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10000).default(30),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+    // Atrás de proxy reverso (ex.: Render): 'true' | 'false' | nº de saltos (1 a 10). Sem isso o rate limit enxerga só o IP do proxy.
+    TRUST_PROXY: z
+      .string()
+      .trim()
+      .regex(/^(true|false|([1-9]|10))$/, 'Use "true", "false" ou um inteiro de 1 a 10.')
+      .default('false')
+      .transform((value): boolean | number => (value === 'true' ? true : value === 'false' ? false : Number(value))),
   })
   .transform((env) => ({
     ...env,
@@ -59,6 +66,8 @@ export interface AppConfig {
   /** Máximo de requisições por IP em `POST /analyze` dentro da janela. */
   readonly rateLimitMax: number;
   readonly rateLimitWindowMs: number;
+  /** Saltos de proxy confiáveis (`true` = todos, `false` = nenhum) para obter o IP real do cliente. */
+  readonly trustProxy: boolean | number;
 }
 
 export class ConfigError extends Error {
@@ -100,6 +109,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     THREAT_FEED_TIMEOUT_MS,
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
+    TRUST_PROXY,
   } = parsed.data;
   return Object.freeze({
     nodeEnv: NODE_ENV,
@@ -112,5 +122,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     threatFeedTimeoutMs: THREAT_FEED_TIMEOUT_MS,
     rateLimitMax: RATE_LIMIT_MAX,
     rateLimitWindowMs: RATE_LIMIT_WINDOW_MS,
+    trustProxy: TRUST_PROXY,
   });
 }

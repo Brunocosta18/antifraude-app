@@ -72,4 +72,33 @@ describe('rate limit em POST /api/v1/analyze', () => {
       await defaultApp.close();
     }
   });
+
+  describe('atrás de proxy (TRUST_PROXY)', () => {
+    const remaining = async (trustProxy: string, forwardedFor: string) => {
+      const proxied = await buildApp(loadConfig({ NODE_ENV: 'test', TRUST_PROXY: trustProxy }));
+      try {
+        const send = (xff: string) =>
+          proxied.inject({
+            method: 'POST',
+            url: URL_PATH,
+            payload: { type: 'message', content: MESSAGE },
+            remoteAddress: '10.9.9.9',
+            headers: { 'x-forwarded-for': xff },
+          });
+        await send(forwardedFor);
+        return (await send('203.0.113.2')).headers['x-ratelimit-remaining'];
+      } finally {
+        await proxied.close();
+      }
+    };
+
+    it('com trustProxy=1, clientes diferentes têm contadores independentes', async () => {
+      // 2º cliente (203.0.113.2) está na 1ª requisição dele: restam 29.
+      expect(await remaining('1', '203.0.113.1')).toBe('29');
+    });
+
+    it('sem trustProxy, o X-Forwarded-For é ignorado e todos compartilham o contador', async () => {
+      expect(await remaining('false', '203.0.113.1')).toBe('28');
+    });
+  });
 });

@@ -17,6 +17,8 @@ services:
       THREAT_FEED_TIMEOUT_MS: "2000"
       RATE_LIMIT_MAX: "30"
       RATE_LIMIT_WINDOW_MS: "60000"
+      # Local, sem proxy reverso na frente
+      TRUST_PROXY: "false"
     read_only: true
     tmpfs:
       - /tmp

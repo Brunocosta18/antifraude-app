@@ -198,7 +198,7 @@ Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens s
 
 ### Limite de requisições
 
-Cada IP pode fazer **30 requisições por minuto** em `POST /api/v1/analyze` (configurável por `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`). Requisições inválidas também contam. `/health` não é limitado. Os contadores ficam só na memória do servidor durante a janela.
+Cada IP pode fazer **30 requisições por minuto** em `POST /api/v1/analyze` (configurável por `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`). Requisições inválidas também contam. `/health` não é limitado. Os contadores ficam só na memória do servidor durante a janela. Atrás de proxy reverso (ex.: Render), defina `TRUST_PROXY` (nº de saltos, ex.: `1`) para o limite valer por IP real do cliente; sem isso todos compartilham o IP do proxy.
 
 Toda resposta desta rota traz `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (segundos até zerar). Ao exceder, a resposta é 429 com `Retry-After` (segundos).
 

@@ -32,6 +32,9 @@ curl http://127.0.0.1:3000/health
 ## Variáveis de ambiente
 Veja [`.env.example`](.env.example). Destaque: `CORS_ORIGIN` aceita uma lista separada por vírgulas; `*` só é permitido fora de produção.
 
+## Deploy
+Guia de deploy gratuito no Render em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## App mobile (Expo)
 O app fica em [`apps/mobile/`](apps/mobile) (Expo + Expo Router + NativeWind), com dependências próprias.
 
