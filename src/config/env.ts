@@ -31,6 +31,15 @@ const envSchema = z
     PHISHING_DB_REFRESH_MS: z.coerce.number().int().min(3_600_000).max(86_400_000).default(21_600_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10000).default(30),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+    // Segredo do HMAC da targetRef do feedback (ANTIGOL-017). Vazio = aleatório por processo. Nunca aparece em erro/log.
+    FEEDBACK_HMAC_SECRET: z
+      .string()
+      .trim()
+      .optional()
+      .transform((secret) => (secret ? secret : null))
+      .refine((secret) => secret === null || secret.length >= 32, 'Use ao menos 32 caracteres.'),
+    // Caminho do SQLite do feedback; ':memory:' zera a cada restart.
+    FEEDBACK_DB_PATH: z.string().trim().min(1).default(':memory:'),
     // Atrás de proxy reverso (ex.: Render): 'true' | 'false' | nº de saltos (1 a 10). Sem isso o rate limit enxerga só o IP do proxy.
     TRUST_PROXY: z
       .string()
@@ -77,6 +86,9 @@ export interface AppConfig {
   readonly rateLimitWindowMs: number;
   /** Saltos de proxy confiáveis (`true` = todos, `false` = nenhum) para obter o IP real do cliente. */
   readonly trustProxy: boolean | number;
+  /** `null` = o app gera um segredo aleatório por processo (as refs agregam só até o restart). */
+  readonly feedbackHmacSecret: string | null;
+  readonly feedbackDbPath: string;
 }
 
 export class ConfigError extends Error {
@@ -121,6 +133,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
     TRUST_PROXY,
+    FEEDBACK_HMAC_SECRET,
+    FEEDBACK_DB_PATH,
   } = parsed.data;
   return Object.freeze({
     nodeEnv: NODE_ENV,
@@ -136,5 +150,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimitMax: RATE_LIMIT_MAX,
     rateLimitWindowMs: RATE_LIMIT_WINDOW_MS,
     trustProxy: TRUST_PROXY,
+    feedbackHmacSecret: FEEDBACK_HMAC_SECRET,
+    feedbackDbPath: FEEDBACK_DB_PATH,
   });
 }

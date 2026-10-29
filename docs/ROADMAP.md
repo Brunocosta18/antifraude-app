@@ -40,5 +40,5 @@ Sistema de detecção de fraudes, golpes e engenharia social focado no mercado b
 
 ## 🟣 Fase 5: Evolução da Inteligência & Funcionalidades Avançadas (Futuro)
 - [x] **ANTIGOL-016**: Novo feed aberto **Phishing.Database** (lista de domínios de phishing baixada pelo servidor e consultada em memória, `TI-PHISHDB-DOMAIN`, composição com o URLhaus via `combineFeeds`) e **validação local de chaves Pix** no app (CPF/CNPJ, e-mail, telefone, chave aleatória; a chave nunca é enviada à API).
-- [ ] **ANTIGOL-017**: Mecanismo de feedback do usuário ("Isso é um golpe?" / "Falso positivo") focado em privacidade.
+- [x] **ANTIGOL-017**: Mecanismo de feedback do usuário ("Isso é um golpe?" / "Falso positivo") focado em privacidade: `POST /api/v1/feedback` com referência opaca (`targetRef`, HMAC) e armazenamento anônimo em SQLite, sem conteúdo, IP nem identificador de dispositivo.
 - [ ] **ANTIGOL-018**: Painel/Dashboard de métricas anônimas de ameaças detectadas no Brasil.

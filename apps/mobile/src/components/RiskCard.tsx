@@ -1,6 +1,7 @@
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-import type { AnalysisReport, RiskLevel, SignalSeverity } from '../types/api';
+import type { AnalysisReport, FeedbackType, RiskLevel, SignalSeverity } from '../types/api';
 
 const LEVEL_TEXT_CLASS: Record<RiskLevel, string> = {
   HIGH_RISK: 'text-risk-high',
@@ -28,8 +29,88 @@ function formatTime(iso?: string): string | null {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+type FeedbackStatus = 'idle' | 'sending' | 'sent' | 'error';
+
+/** Texto fixo: nunca ecoa a mensagem de erro nem o conteúdo (LGPD). */
+function FeedbackSection({
+  level,
+  onFeedback,
+  disabled,
+}: {
+  level: RiskLevel;
+  onFeedback: (type: FeedbackType) => Promise<void>;
+  disabled: boolean;
+}) {
+  const [status, setStatus] = useState<FeedbackStatus>('idle');
+
+  async function send(type: FeedbackType) {
+    if (status === 'sending') return;
+    setStatus('sending');
+    try {
+      await onFeedback(type);
+      setStatus('sent');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  if (status === 'sent') {
+    return (
+      <Text testID="feedback-thanks" className="mt-4 text-sm text-gray-700">
+        Obrigado! Seu retorno é anônimo.
+      </Text>
+    );
+  }
+
+  const blocked = disabled || status === 'sending';
+  return (
+    <View className="mt-4">
+      <Text className="text-base font-semibold text-gray-900">Este resultado ajudou?</Text>
+      <View className="mt-2 flex-row">
+        <Pressable
+          testID="feedback-scam"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: blocked }}
+          disabled={blocked}
+          onPress={() => void send('SCAM_REPORT')}
+          className={`mr-2 rounded-lg border px-3 py-2 ${blocked ? 'border-gray-200' : 'border-gray-400'}`}
+        >
+          <Text className="text-sm text-gray-900">Isso é golpe</Text>
+        </Pressable>
+        {level !== 'NO_KNOWN_INDICATORS' ? (
+          <Pressable
+            testID="feedback-false-positive"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: blocked }}
+            disabled={blocked}
+            onPress={() => void send('FALSE_POSITIVE')}
+            className={`rounded-lg border px-3 py-2 ${blocked ? 'border-gray-200' : 'border-gray-400'}`}
+          >
+            <Text className="text-sm text-gray-900">Falso positivo</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {status === 'error' ? (
+        <Text testID="feedback-error" className="mt-2 text-xs text-risk-high">
+          Não foi possível enviar agora. Tente novamente.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 /** Todo texto exibido vem do relatório da API; nunca do conteúdo digitado (LGPD). */
-export function RiskCard({ report, analyzedAt }: { report: AnalysisReport; analyzedAt?: string }) {
+export function RiskCard({
+  report,
+  analyzedAt,
+  onFeedback,
+  feedbackDisabled = false,
+}: {
+  report: AnalysisReport;
+  analyzedAt?: string;
+  onFeedback?: (type: FeedbackType) => Promise<void>;
+  feedbackDisabled?: boolean;
+}) {
   const time = formatTime(analyzedAt);
   return (
     <View
@@ -78,6 +159,8 @@ export function RiskCard({ report, analyzedAt }: { report: AnalysisReport; analy
           Fonte externa indisponível; análise feita com regras locais.
         </Text>
       ) : null}
+
+      {onFeedback ? <FeedbackSection level={report.level} onFeedback={onFeedback} disabled={feedbackDisabled} /> : null}
 
       <Text className="mt-4 text-sm text-gray-600">{report.disclaimer}</Text>
     </View>

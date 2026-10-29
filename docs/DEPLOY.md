@@ -13,6 +13,7 @@ A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repo
 2. Preencha as variáveis marcadas como `sync: false`:
    - `CORS_ORIGIN`: origem(ns) da PWA, separadas por vírgula (ex.: `https://app.exemplo.com.br`). **Não use `*`**: em produção o boot rejeita.
    - `URLHAUS_AUTH_KEY` (opcional): chave gratuita em <https://auth.abuse.ch/>. Vazia = feed desligado e a API segue só com as regras locais (graceful degradation).
+   - `FEEDBACK_HMAC_SECRET` (recomendado, ANTIGOL-017): segredo de pelo menos 32 caracteres (ex.: `openssl rand -hex 32`) que assina a referência opaca do feedback. Vazio = aleatório a cada restart, e as refs só agregam até lá.
 3. Clique em **Apply**. O Render faz o build da imagem e passa a consultar `/health`.
 
 ## Segredos
@@ -35,6 +36,8 @@ A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repo
 | `RATE_LIMIT_WINDOW_MS` | `60000` | inteiro de 1000 a 3600000 |
 | `CORS_ORIGIN` | preencher no painel | lista separada por vírgula; sem `*` em produção |
 | `URLHAUS_AUTH_KEY` | preencher no painel (segredo, opcional) | texto; vazio = feed desligado |
+| `FEEDBACK_HMAC_SECRET` | preencher no painel (segredo) | 32+ caracteres; vazio = aleatório por processo |
+| `FEEDBACK_DB_PATH` | padrão `:memory:` | caminho do SQLite; `:memory:` zera a cada restart |
 
 `TRUST_PROXY=1` faz a API usar o IP real do cliente (entrada do `X-Forwarded-For` anexada pelo proxy do Render) no rate limit por IP. Sem isso, todos os usuários dividiriam o limite do IP do proxy. O valor é um número de saltos: se a validação abaixo falhar, ajuste-o no painel, sem mudar código.
 
@@ -43,6 +46,7 @@ A API roda como container Docker (`apps/api/Dockerfile`, contexto = raiz do repo
 - 750 horas de instância por mês.
 - Feed Phishing.Database (ANTIGOL-016): a lista (~11 MB) é baixada a cada restart e mantida em memória (algumas dezenas de MB a mais, dentro dos 512 MB do Free). Até o download terminar (e se ele falhar) o `externalCheck` fica `unavailable` e a análise segue só com as regras locais.
 - Os contadores do rate limit ficam em memória e zeram a cada restart/deploy.
+- Feedback anônimo (ANTIGOL-017): o SQLite fica em `:memory:`, então os registros zeram a cada restart/deploy (o Free não tem disco persistente). O `node:sqlite` pode emitir um `ExperimentalWarning` no log de inicialização; é esperado. Exige Node >= 22.13 (a imagem usa Node 24).
 - As flags `read_only`, `cap_drop` e `no-new-privileges` do `docker-compose.yml` não existem no Render; o `USER node` do Dockerfile continua valendo.
 
 ## Validação pós-deploy

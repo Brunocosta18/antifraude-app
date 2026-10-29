@@ -75,7 +75,7 @@ describe('POST /api/v1/analyze', () => {
       expect(res.headers['cache-control']).toBe('no-store');
 
       const body = res.json();
-      expect(Object.keys(body).sort()).toEqual(['report', 'type']);
+      expect(Object.keys(body).sort()).toEqual(['report', 'targetRef', 'type']);
       expect(Object.keys(body.report).sort()).toEqual(['advice', 'disclaimer', 'externalCheck', 'label', 'level', 'score', 'signals']);
       expect(body.report.disclaimer).toEqual(expect.any(String));
       expect(body.report.disclaimer.length).toBeGreaterThan(0);
@@ -91,6 +91,25 @@ describe('POST /api/v1/analyze', () => {
         'title',
         'weight',
       ]);
+    });
+  });
+
+  describe('targetRef (ANTIGOL-017)', () => {
+    it('é 64 hex, estável para o mesmo site e não revela o conteúdo', async () => {
+      const a = (await post({ type: 'url', content: 'https://www.alvo-sigiloso.example.xyz/a' })).json();
+      const b = (await post({ type: 'url', content: 'http://alvo-sigiloso.example.xyz/outro' })).json();
+      expect(a.targetRef).toMatch(/^[a-f0-9]{64}$/);
+      expect(b.targetRef).toBe(a.targetRef);
+      expect(JSON.stringify(a)).not.toContain('alvo-sigiloso');
+    });
+
+    it('mensagem: estável e diferente de outra mensagem', async () => {
+      const a = (await post({ type: 'message', content: 'Pague agora o boleto' })).json();
+      const b = (await post({ type: 'message', content: 'Pague agora o boleto' })).json();
+      const c = (await post({ type: 'message', content: 'Outra coisa' })).json();
+      expect(a.targetRef).toMatch(/^[a-f0-9]{64}$/);
+      expect(b.targetRef).toBe(a.targetRef);
+      expect(c.targetRef).not.toBe(a.targetRef);
     });
   });
 

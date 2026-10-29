@@ -1,28 +1,25 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import { analyzeMessageWithFeed, analyzeUrlWithFeed } from '../../core/analyzer.js';
+import { computeTargetRef } from '../../core/feedback/target-ref.js';
 import type { ThreatFeed } from '../../core/types.js';
-import { invalidUrlError, rateLimitError, unsupportedMediaTypeError, validationError, zodIssuesToDetails } from '../errors.js';
+import { requireJsonContentType } from '../content-type.js';
+import { invalidUrlError, rateLimitError, validationError, zodIssuesToDetails } from '../errors.js';
 import { analyzeRequestSchema, analyzeResponseSchema } from '../schemas/analyze.js';
 
 /** Limite do corpo: 5000 caracteres de mensagem cabem com folga (UTF-8 + JSON). */
 const ANALYZE_BODY_LIMIT = 32 * 1024;
 
-/** Fastify aceita text/plain por padrão; aqui só JSON é aceito (sem Content-Type = corpo ausente → 422). */
-const JSON_CONTENT_TYPE = /^application\/(?:[\w.+-]+\+)?json\s*(?:;|$)/i;
-
 /**
  * POST /analyze — análise local somada ao `ThreatFeed` (só o hostname sai; falha → resultado local).
  * O conteúdo enviado nunca é devolvido, logado nem armazenado.
  */
-export const analyzeRoutes: FastifyPluginAsync<{ threatFeed: ThreatFeed; rateLimit: { max: number; timeWindow: number } }> = async (
-  app,
-  { threatFeed, rateLimit },
-) => {
-  app.addHook('preValidation', async (request) => {
-    const contentType = request.headers['content-type'];
-    if (contentType !== undefined && !JSON_CONTENT_TYPE.test(contentType)) throw unsupportedMediaTypeError();
-  });
+export const analyzeRoutes: FastifyPluginAsync<{
+  threatFeed: ThreatFeed;
+  feedbackSecret: string;
+  rateLimit: { max: number; timeWindow: number };
+}> = async (app, { threatFeed, feedbackSecret, rateLimit }) => {
+  app.addHook('preValidation', requireJsonContentType);
 
   app.post(
     '/analyze',
@@ -39,11 +36,14 @@ export const analyzeRoutes: FastifyPluginAsync<{ threatFeed: ThreatFeed; rateLim
       const { type, content } = parsed.data;
       void reply.header('Cache-Control', 'no-store');
 
-      if (type === 'message') return { type, report: await analyzeMessageWithFeed(content, threatFeed) };
+      if (type === 'message') {
+        const report = await analyzeMessageWithFeed(content, threatFeed);
+        return { type, targetRef: computeTargetRef(feedbackSecret, type, content), report };
+      }
 
       const result = await analyzeUrlWithFeed(content, threatFeed);
       if (!result.ok) throw invalidUrlError(result.reason);
-      return { type, report: result.value };
+      return { type, targetRef: computeTargetRef(feedbackSecret, type, content), report: result.value };
     },
   );
 };

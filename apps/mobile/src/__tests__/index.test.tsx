@@ -18,6 +18,7 @@ const SECRET = 'texto privado do usuario 123 segredo';
 
 const okResponse: AnalyzeResponse = {
   type: 'url',
+  targetRef: 'a1'.repeat(32),
   report: {
     level: 'NO_KNOWN_INDICATORS',
     label: 'Nenhum Indicador Conhecido Encontrado',

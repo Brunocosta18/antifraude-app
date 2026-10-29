@@ -20,3 +20,4 @@ services:
       - { key: RATE_LIMIT_WINDOW_MS, value: "60000" }
       - { key: CORS_ORIGIN, sync: false } # preenchido no painel (origem da PWA, ANTIGOL-015)
       - { key: URLHAUS_AUTH_KEY, sync: false } # segredo: só no painel, nunca no repositório
+      - { key: FEEDBACK_HMAC_SECRET, sync: false } # segredo (>= 32 caracteres) da targetRef do feedback (ANTIGOL-017)

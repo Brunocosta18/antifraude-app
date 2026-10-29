@@ -9,6 +9,7 @@ const SECRET = 'texto privado do usuario 123 segredo';
 
 const okBody: AnalyzeResponse = {
   type: 'message',
+  targetRef: 'a1'.repeat(32),
   report: {
     level: 'NO_KNOWN_INDICATORS',
     label: 'Nenhum Indicador Conhecido Encontrado',
@@ -88,5 +89,31 @@ describe('integração: tela + api.ts real + fetch simulado', () => {
 
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ type: 'message', content: SECRET });
+  });
+
+  it('feedback: envia só ref, nível e IDs, nunca o texto digitado', async () => {
+    fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(okBody), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'received' }), { status: 201, headers: { 'Content-Type': 'application/json' } }),
+      );
+    await render(<Index />);
+    await typeAndSubmit();
+    await screen.findByText(okBody.report.label);
+    await fireEvent.press(screen.getByTestId('feedback-scam'));
+    expect(await screen.findByTestId('feedback-thanks')).toBeTruthy();
+
+    const [url, init] = fetchSpy.mock.calls[1] as [string, RequestInit];
+    expect(url).toMatch(/\/api\/v1\/feedback$/);
+    expect(JSON.parse(init.body as string)).toEqual({
+      type: 'SCAM_REPORT',
+      target: { type: 'message', ref: okBody.targetRef },
+      level: 'NO_KNOWN_INDICATORS',
+      signalIds: [],
+    });
+    expect(init.body as string).not.toContain(SECRET);
   });
 });

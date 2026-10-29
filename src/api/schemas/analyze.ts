@@ -44,10 +44,12 @@ const signalSchema = {
 /** Resposta 200. `additionalProperties: false` faz o serializador descartar qualquer campo inesperado. */
 export const analyzeResponseSchema = {
   type: 'object',
-  required: ['type', 'report'],
+  required: ['type', 'targetRef', 'report'],
   additionalProperties: false,
   properties: {
     type: { type: 'string', enum: ['message', 'url'] },
+    // Referência opaca (HMAC) para o feedback anônimo (ANTIGOL-017); nunca revela o conteúdo.
+    targetRef: { type: 'string', pattern: '^[a-f0-9]{64}$' },
     report: {
       type: 'object',
       required: ['level', 'label', 'score', 'signals', 'advice', 'disclaimer', 'externalCheck'],

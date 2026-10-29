@@ -1,4 +1,4 @@
-import { analyze, analyzeTarget, detectAnalyzeType, isAppError } from '../api';
+import { analyze, analyzeTarget, detectAnalyzeType, isAppError, sendFeedback } from '../api';
 import type { AppError } from '../api';
 import type { AnalyzeResponse } from '../../types/api';
 
@@ -6,6 +6,7 @@ const SECRET = 'minha-chave-pix-123@segredo.com';
 
 const okBody: AnalyzeResponse = {
   type: 'url',
+  targetRef: 'a1'.repeat(32),
   report: {
     level: 'NO_KNOWN_INDICATORS',
     label: 'Nenhum Indicador Conhecido Encontrado',
@@ -184,5 +185,32 @@ describe('analyzeTarget', () => {
     await analyzeTarget('  exemplo.com/pagar  ', { fetchFn });
     const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ type: 'url', content: 'exemplo.com/pagar' });
+  });
+});
+
+describe('sendFeedback', () => {
+  const input = {
+    type: 'SCAM_REPORT' as const,
+    target: { type: 'url' as const, ref: 'a1'.repeat(32) },
+    level: 'HIGH_RISK' as const,
+    signalIds: ['DOM-TYPOSQUAT'],
+  };
+
+  it('faz POST em /api/v1/feedback com o corpo exato e só os headers esperados', async () => {
+    const fetchFn = fake(async () => jsonResponse(201, { status: 'received' }));
+    await expect(sendFeedback(input, { fetchFn })).resolves.toEqual({ status: 'received' });
+    const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/api\/v1\/feedback$/);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual(input);
+    expect(Object.keys(init.headers as object).sort()).toEqual(['Accept', 'Content-Type']);
+  });
+
+  it('mapeia 503 FEEDBACK_UNAVAILABLE', async () => {
+    const body = { error: { code: 'FEEDBACK_UNAVAILABLE', message: 'Indisponível.' } };
+    const fetchFn = fake(async () => jsonResponse(503, body));
+    const err = await catchError(sendFeedback(input, { fetchFn }));
+    expect(err.code).toBe('FEEDBACK_UNAVAILABLE');
+    expect(err.status).toBe(503);
   });
 });

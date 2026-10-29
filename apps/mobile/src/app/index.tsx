@@ -11,10 +11,10 @@ import {
   View,
 } from 'react-native';
 
-import { analyzeTarget, isAppError } from '../services/api';
+import { analyzeTarget, isAppError, sendFeedback } from '../services/api';
 import { PixKeyFeedback } from '../components/PixKeyFeedback';
 import { RiskCard } from '../components/RiskCard';
-import type { AnalyzeResponse } from '../types/api';
+import type { AnalyzeResponse, FeedbackType } from '../types/api';
 import { validatePixKey } from '../utils/pix';
 
 const MAX_LENGTH = 5000;
@@ -61,6 +61,16 @@ export default function Index() {
         setRetryIn(e.retryAfterSeconds);
       }
     }
+  }
+
+  // Só ref opaca, nível e IDs de regra: o texto digitado nunca é reenviado (LGPD).
+  async function onFeedback(response: AnalyzeResponse, type: FeedbackType) {
+    await sendFeedback({
+      type,
+      target: { type: response.type, ref: response.targetRef },
+      level: response.report.level,
+      signalIds: response.report.signals.map((signal) => signal.id),
+    });
   }
 
   return (
@@ -128,7 +138,13 @@ export default function Index() {
         ) : null}
 
         {state.status === 'success' ? (
-          <RiskCard report={state.response.report} analyzedAt={state.analyzedAt} />
+          <RiskCard
+            key={state.analyzedAt}
+            report={state.response.report}
+            analyzedAt={state.analyzedAt}
+            onFeedback={(type) => onFeedback(state.response, type)}
+            feedbackDisabled={offline}
+          />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>

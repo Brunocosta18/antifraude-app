@@ -107,6 +107,27 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('feedback (ANTIGOL-017)', () => {
+    it('padrões: sem segredo e banco em memória', () => {
+      expect(loadConfig({})).toMatchObject({ feedbackHmacSecret: null, feedbackDbPath: ':memory:' });
+    });
+
+    it('lê segredo (com trim) e caminho do banco', () => {
+      const secret = 'x'.repeat(32);
+      expect(loadConfig({ FEEDBACK_HMAC_SECRET: ` ${secret} `, FEEDBACK_DB_PATH: '/tmp/f.db' })).toMatchObject({
+        feedbackHmacSecret: secret,
+        feedbackDbPath: '/tmp/f.db',
+      });
+      expect(loadConfig({ FEEDBACK_HMAC_SECRET: '  ' }).feedbackHmacSecret).toBeNull();
+    });
+
+    it('rejeita segredo curto sem vazar o valor', () => {
+      const act = () => loadConfig({ FEEDBACK_HMAC_SECRET: 'segredo-curto-123' });
+      expect(act).toThrow(/FEEDBACK_HMAC_SECRET/);
+      expect(act).not.toThrow(/segredo-curto-123/);
+    });
+  });
+
   describe('phishing database', () => {
     it('padrões: desligado e refresh de 6 h', () => {
       const config = loadConfig({});

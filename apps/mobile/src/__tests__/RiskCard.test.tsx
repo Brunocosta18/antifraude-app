@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { RiskCard } from '../components/RiskCard';
 import type { AnalysisReport, RiskLevel } from '../types/api';
@@ -97,5 +97,58 @@ describe('RiskCard', () => {
   it('omite o horário quando analyzedAt é inválido', async () => {
     await render(<RiskCard report={makeReport()} analyzedAt="não-é-data" />);
     expect(screen.queryByTestId('analyzed-at')).toBeNull();
+  });
+
+  describe('feedback anônimo (ANTIGOL-017)', () => {
+    it('sem onFeedback não renderiza a seção', async () => {
+      await render(<RiskCard report={makeReport({ level: 'HIGH_RISK', label: 'Alto Risco' })} />);
+      expect(screen.queryByTestId('feedback-scam')).toBeNull();
+      expect(screen.queryByTestId('feedback-false-positive')).toBeNull();
+    });
+
+    it('com onFeedback mostra os dois botões', async () => {
+      await render(<RiskCard report={makeReport({ level: 'HIGH_RISK', label: 'Alto Risco' })} onFeedback={jest.fn()} />);
+      expect(screen.getByText('Este resultado ajudou?')).toBeTruthy();
+      expect(screen.getByTestId('feedback-scam')).toBeTruthy();
+      expect(screen.getByTestId('feedback-false-positive')).toBeTruthy();
+    });
+
+    it('oculta "Falso positivo" em NO_KNOWN_INDICATORS', async () => {
+      await render(<RiskCard report={makeReport()} onFeedback={jest.fn()} />);
+      expect(screen.getByTestId('feedback-scam')).toBeTruthy();
+      expect(screen.queryByTestId('feedback-false-positive')).toBeNull();
+    });
+
+    it.each([
+      ['feedback-scam', 'SCAM_REPORT'],
+      ['feedback-false-positive', 'FALSE_POSITIVE'],
+    ])('%s chama onFeedback(%s) e agradece', async (testID, type) => {
+      const onFeedback = jest.fn().mockResolvedValue(undefined);
+      await render(<RiskCard report={makeReport({ level: 'HIGH_RISK', label: 'Alto Risco' })} onFeedback={onFeedback} />);
+      await fireEvent.press(screen.getByTestId(testID));
+      await waitFor(() => expect(screen.getByTestId('feedback-thanks')).toBeTruthy());
+      expect(onFeedback).toHaveBeenCalledWith(type);
+      expect(screen.getByText('Obrigado! Seu retorno é anônimo.')).toBeTruthy();
+      expect(screen.queryByTestId('feedback-scam')).toBeNull();
+    });
+
+    it('em erro mostra texto fixo e reabilita os botões', async () => {
+      const onFeedback = jest.fn().mockRejectedValue(new Error('segredo-interno'));
+      await render(<RiskCard report={makeReport({ level: 'HIGH_RISK', label: 'Alto Risco' })} onFeedback={onFeedback} />);
+      await fireEvent.press(screen.getByTestId('feedback-scam'));
+      await waitFor(() => expect(screen.getByTestId('feedback-error')).toBeTruthy());
+      expect(screen.queryByText(/segredo-interno/)).toBeNull();
+      expect(screen.getByTestId('feedback-scam')).not.toBeDisabled();
+    });
+
+    it('feedbackDisabled desabilita os botões', async () => {
+      const onFeedback = jest.fn();
+      await render(
+        <RiskCard report={makeReport({ level: 'HIGH_RISK', label: 'Alto Risco' })} onFeedback={onFeedback} feedbackDisabled />,
+      );
+      expect(screen.getByTestId('feedback-scam')).toBeDisabled();
+      await fireEvent.press(screen.getByTestId('feedback-scam'));
+      expect(onFeedback).not.toHaveBeenCalled();
+    });
   });
 });

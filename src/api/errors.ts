@@ -16,6 +16,7 @@ const MESSAGES = {
   PAYLOAD_TOO_LARGE: 'O corpo da requisição é grande demais.',
   UNSUPPORTED_MEDIA_TYPE: 'Use o tipo de conteúdo application/json.',
   RATE_LIMIT_EXCEEDED: 'Muitas requisições enviadas. Tente novamente mais tarde.',
+  FEEDBACK_UNAVAILABLE: 'Não foi possível registrar seu retorno agora. Tente novamente mais tarde.',
   NOT_FOUND: 'Rota não encontrada.',
   REQUEST_ERROR: 'A requisição não pôde ser processada.',
   INTERNAL_ERROR: 'Erro interno. Tente novamente mais tarde.',
@@ -54,6 +55,10 @@ export function unsupportedMediaTypeError(): ApiError {
 
 export function rateLimitError(): ApiError {
   return new ApiError(429, 'RATE_LIMIT_EXCEEDED');
+}
+
+export function feedbackUnavailableError(): ApiError {
+  return new ApiError(503, 'FEEDBACK_UNAVAILABLE');
 }
 
 export function invalidUrlError(reason: string): ApiError {

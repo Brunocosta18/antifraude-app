@@ -25,7 +25,7 @@ Limites: mensagem até **5000** caracteres, URL até **2048** caracteres, corpo 
 
 ### Response 200
 
-`{ "type", "report" }`. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice`, `disclaimer` e `externalCheck`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
+`{ "type", "targetRef", "report" }`. O `targetRef` é uma referência opaca (HMAC-SHA256 com segredo do servidor, 64 caracteres hex) do alvo analisado, usada no `POST /api/v1/feedback` sem reenviar o conteúdo; para links, agrega pelo domínio registrável. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice`, `disclaimer` e `externalCheck`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
 
 `externalCheck` informa a consulta à fonte externa de ameaças (URLhaus, abuse.ch, e Phishing.Database). Com mais de um feed ativo, o valor é o pior caso: qualquer feed `unavailable` → `unavailable`; senão algum `checked` → `checked`; senão `disabled`:
 
@@ -50,6 +50,7 @@ Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNO
 ```json
 {
   "type": "url",
+  "targetRef": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f",
   "report": {
     "level": "HIGH_RISK",
     "label": "Alto Risco",
@@ -78,6 +79,7 @@ Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNO
 ```json
 {
   "type": "url",
+  "targetRef": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f",
   "report": {
     "level": "NO_KNOWN_INDICATORS",
     "label": "Nenhum Indicador Conhecido Encontrado",
@@ -98,6 +100,7 @@ Request: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 h
 ```json
 {
   "type": "message",
+  "targetRef": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f",
   "report": {
     "level": "HIGH_RISK",
     "label": "Alto Risco",
@@ -126,6 +129,7 @@ Request: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 h
 ```json
 {
   "type": "message",
+  "targetRef": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f",
   "report": {
     "level": "NO_KNOWN_INDICATORS",
     "label": "Nenhum Indicador Conhecido Encontrado",
@@ -151,6 +155,7 @@ Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens s
 | 422 | `VALIDATION_ERROR` | corpo ausente ou não-objeto, `type` desconhecido, `content` ausente, não-string, vazio, acima do limite, ou campos extras |
 | 422 | `INVALID_URL` | link rejeitado: `EMPTY`, `TOO_LONG`, `INVALID_URL`, `UNSUPPORTED_SCHEME`, `LOCAL_HOSTNAME` ou `PRIVATE_ADDRESS` |
 | 429 | `RATE_LIMIT_EXCEEDED` | limite de requisições por IP excedido; veja `Retry-After` |
+| 503 | `FEEDBACK_UNAVAILABLE` | só em `/feedback`: o armazenamento falhou; tente de novo mais tarde |
 | 404 | `NOT_FOUND` | rota inexistente (inclui `GET /api/v1/analyze`) |
 | 4xx | `REQUEST_ERROR` | outro erro de cliente detectado pelo servidor (ex.: `Content-Length` inválido); o status original é mantido |
 | 500 | `INTERNAL_ERROR` | erro inesperado, sem detalhes |
@@ -217,3 +222,52 @@ curl -s -X POST http://127.0.0.1:3000/api/v1/analyze \
 - Com o URLhaus ativo, **somente o hostname** (nunca o caminho, a query ou a mensagem) é enviado ao abuse.ch, em até 3 hostnames distintos por análise. A URL exata é comparada localmente. Os logs de falha registram apenas o motivo (`timeout`, `network`, `http_status`, `invalid_response`, `too_large`).
 - O conteúdo enviado não volta na resposta, nem em mensagens de erro; os logs registram apenas id, método, caminho, status e tempo.
 - O resultado não é garantia de segurança: a análise usa sinais conhecidos e pode não detectar golpes novos.
+
+---
+
+## POST /api/v1/feedback
+
+Retorno anônimo do usuário sobre um resultado ("Isso é golpe" ou "Falso positivo", ANTIGOL-017). O conteúdo analisado **nunca** é reenviado: o app manda só a `targetRef` recebida no `/analyze`.
+
+### Request
+
+```json
+{
+  "type": "SCAM_REPORT",
+  "target": { "type": "url", "ref": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f" },
+  "level": "HIGH_RISK",
+  "signalIds": ["DOM-TYPOSQUAT"]
+}
+```
+
+| Campo | Tipo | Regras |
+|---|---|---|
+| `type` | `"SCAM_REPORT"` ou `"FALSE_POSITIVE"` | obrigatório |
+| `target.type` | `"message"` ou `"url"` | obrigatório |
+| `target.ref` | string | obrigatório; 64 caracteres hex minúsculos (a `targetRef` do `/analyze`) |
+| `level` | `HIGH_RISK`, `NEEDS_ATTENTION` ou `NO_KNOWN_INDICATORS` | obrigatório; o nível exibido ao usuário |
+| `signalIds` | string[] | opcional (padrão `[]`); até 20 IDs de regra no padrão `^[A-Z0-9-]{1,40}$` |
+
+Corpo até **4 KB**; campos extras são rejeitados.
+
+### Response 201
+
+```json
+{ "status": "received" }
+```
+
+Usa `Cache-Control: no-store`.
+
+### Erros
+
+Mesmo formato do `/analyze`: 400 `MALFORMED_JSON`, 413 `PAYLOAD_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE`, 422 `VALIDATION_ERROR`, 429 `RATE_LIMIT_EXCEEDED` (contador próprio da rota, mesmos limites) e 503 `FEEDBACK_UNAVAILABLE`:
+
+```json
+{ "error": { "code": "FEEDBACK_UNAVAILABLE", "message": "Não foi possível registrar seu retorno agora. Tente novamente mais tarde." } }
+```
+
+### Privacidade
+
+- São gravados apenas: tipo do feedback, tipo do alvo, `targetRef`, nível, IDs de regra e a **data** (sem hora, para não correlacionar com logs de acesso).
+- Não há IP, user-agent, UUID, identificador de dispositivo nem conteúdo. Os logs não registram o corpo.
+- Armazenamento em SQLite (`node:sqlite`); com o padrão `FEEDBACK_DB_PATH=:memory:` os dados zeram a cada restart. Sem `FEEDBACK_HMAC_SECRET` o segredo é aleatório por processo, e as refs só agregam até o restart.

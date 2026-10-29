@@ -31,6 +31,7 @@ describe('apps/api/Dockerfile', () => {
 
   it('não embute segredos', () => {
     expect(dockerfile).not.toContain('URLHAUS_AUTH_KEY');
+    expect(dockerfile).not.toContain('FEEDBACK_HMAC_SECRET');
   });
 });
 
@@ -54,6 +55,11 @@ describe('docker-compose.yml', () => {
   it('aponta para o Dockerfile e escuta em 0.0.0.0', () => {
     expect(compose).toContain('apps/api/Dockerfile');
     expect(compose).toMatch(/HOST:\s*0\.0\.0\.0/);
+  });
+
+  it('passa o segredo do feedback só em runtime e mantém read_only (SQLite em memória)', () => {
+    expect(compose).toMatch(/FEEDBACK_HMAC_SECRET:\s*\$\{FEEDBACK_HMAC_SECRET:-\}/);
+    expect(compose).toMatch(/read_only:\s*true/);
   });
 
   it('não usa CORS_ORIGIN curinga', () => {

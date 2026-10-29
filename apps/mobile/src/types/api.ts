@@ -35,7 +35,19 @@ export interface AnalysisReport {
 
 export interface AnalyzeResponse {
   type: AnalyzeType;
+  /** Referência opaca do alvo (HMAC): usada no feedback sem reenviar o conteúdo. */
+  targetRef: string;
   report: AnalysisReport;
+}
+
+export type FeedbackType = 'SCAM_REPORT' | 'FALSE_POSITIVE';
+
+/** Corpo de POST /api/v1/feedback: só a referência opaca, o nível e IDs de regra (nunca o conteúdo). */
+export interface FeedbackRequest {
+  type: FeedbackType;
+  target: { type: AnalyzeType; ref: string };
+  level: RiskLevel;
+  signalIds: string[];
 }
 
 export interface ApiErrorDetail {
@@ -59,6 +71,7 @@ export type ServerErrorCode =
   | 'PAYLOAD_TOO_LARGE'
   | 'UNSUPPORTED_MEDIA_TYPE'
   | 'RATE_LIMIT_EXCEEDED'
+  | 'FEEDBACK_UNAVAILABLE'
   | 'NOT_FOUND'
   | 'REQUEST_ERROR'
   | 'INTERNAL_ERROR';

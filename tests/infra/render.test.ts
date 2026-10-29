@@ -32,6 +32,11 @@ describe('render.yaml', () => {
     expect(render).toMatch(/key:\s*URLHAUS_AUTH_KEY,\s*sync:\s*false/);
   });
 
+  it('deixa FEEDBACK_HMAC_SECRET para o painel (sync: false)', () => {
+    expect(render).toMatch(/key:\s*FEEDBACK_HMAC_SECRET,\s*sync:\s*false/);
+    expect(render).not.toMatch(/key:\s*FEEDBACK_HMAC_SECRET,\s*value/);
+  });
+
   it('liga o feed Phishing.Database (sem segredo)', () => {
     expect(render).toMatch(/key:\s*PHISHING_DB_ENABLED,\s*value:\s*"true"/);
   });

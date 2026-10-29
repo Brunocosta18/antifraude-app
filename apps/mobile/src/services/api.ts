@@ -5,6 +5,7 @@ import type {
   ApiErrorBody,
   ApiErrorCode,
   ApiErrorDetail,
+  FeedbackRequest,
 } from '../types/api';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -126,6 +127,19 @@ export async function request<T>(path: string, init: RequestInit = {}, options: 
 export function analyze(input: AnalyzeRequest, options?: RequestOptions): Promise<AnalyzeResponse> {
   return request<AnalyzeResponse>(
     '/api/v1/analyze',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(input),
+    },
+    options,
+  );
+}
+
+/** Só ref opaca, nível e IDs de regra; nenhum header extra nem identificador de dispositivo. */
+export function sendFeedback(input: FeedbackRequest, options?: RequestOptions): Promise<{ status: 'received' }> {
+  return request<{ status: 'received' }>(
+    '/api/v1/feedback',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

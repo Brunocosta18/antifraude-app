@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -5,11 +7,14 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 
 import { errorHandler, notFoundHandler } from './api/errors.js';
 import { analyzeRoutes } from './api/routes/analyze.js';
+import { feedbackRoutes } from './api/routes/feedback.js';
 import { healthRoutes } from './api/routes/health.js';
 import { combineFeeds } from './adapters/composite-feed.js';
 import { createPhishingDatabaseFeed, PHISHING_DB_LIST_URL } from './adapters/phishing-database.js';
+import { createSqliteFeedbackStore } from './adapters/sqlite-feedback-store.js';
 import { createUrlhausFeed, disabledThreatFeed } from './adapters/urlhaus.js';
 import type { AppConfig } from './config/env.js';
+import type { FeedbackStore } from './core/feedback/types.js';
 import type { ThreatFeed } from './core/types.js';
 
 /**
@@ -54,7 +59,7 @@ function trustProxyOption(trustProxy: boolean | number): boolean | ((address: st
 }
 
 /** Fábrica da aplicação: monta plugins e rotas sem abrir porta (facilita testes). */
-export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed } = {}): Promise<FastifyInstance> {
+export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed; feedbackStore?: FeedbackStore } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: loggerOptions(config), trustProxy: trustProxyOption(config.trustProxy) });
 
   let threatFeed = deps.threatFeed ?? disabledThreatFeed;
@@ -81,6 +86,14 @@ export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFee
     if (feeds.length > 0) threatFeed = combineFeeds(feeds);
   }
 
+  let feedbackSecret = config.feedbackHmacSecret;
+  if (feedbackSecret === null) {
+    feedbackSecret = randomBytes(32).toString('hex');
+    app.log.info('FEEDBACK_HMAC_SECRET ausente: segredo aleatório por processo (as refs de feedback agregam só até o restart)');
+  }
+  const feedbackStore = deps.feedbackStore ?? createSqliteFeedbackStore(config.feedbackDbPath);
+  app.addHook('onClose', async () => feedbackStore.close());
+
   await app.register(helmet);
   await app.register(cors, {
     origin: config.corsOrigin === true ? true : [...config.corsOrigin],
@@ -99,6 +112,12 @@ export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFee
   await app.register(analyzeRoutes, {
     prefix: '/api/v1',
     threatFeed,
+    feedbackSecret,
+    rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
+  });
+  await app.register(feedbackRoutes, {
+    prefix: '/api/v1',
+    store: feedbackStore,
     rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
   });
 
