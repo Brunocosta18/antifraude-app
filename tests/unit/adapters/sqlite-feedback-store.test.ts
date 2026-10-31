@@ -29,6 +29,16 @@ describe('createSqliteFeedbackStore', () => {
     store.close();
   });
 
+  it('totals soma todas as refs por tipo', () => {
+    const store = createSqliteFeedbackStore(':memory:');
+    expect(store.totals()).toEqual({ scamReports: 0, falsePositives: 0 });
+    store.save(entry());
+    store.save(entry({ targetRef: 'b'.repeat(64) }));
+    store.save(entry({ type: 'FALSE_POSITIVE' }));
+    expect(store.totals()).toEqual({ scamReports: 2, falsePositives: 1 });
+    store.close();
+  });
+
   it('rejeita dados fora do esquema (CHECK)', () => {
     const store = createSqliteFeedbackStore(':memory:');
     expect(() => store.save(entry({ targetRef: 'curta' }))).toThrow();

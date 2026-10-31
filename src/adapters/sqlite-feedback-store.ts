@@ -26,6 +26,16 @@ export function createSqliteFeedbackStore(path: string): FeedbackStore {
     'INSERT INTO feedbacks (type, target_type, target_ref, level, signal_ids, created_on) VALUES (?, ?, ?, ?, ?, ?)',
   );
   const count = db.prepare('SELECT type, COUNT(*) AS total FROM feedbacks WHERE target_ref = ? GROUP BY type');
+  const countAll = db.prepare('SELECT type, COUNT(*) AS total FROM feedbacks GROUP BY type');
+
+  const toSummary = (rows: unknown[]): FeedbackSummary => {
+    const result: FeedbackSummary = { scamReports: 0, falsePositives: 0 };
+    for (const row of rows as { type: string; total: number }[]) {
+      if (row.type === 'SCAM_REPORT') result.scamReports = Number(row.total);
+      else if (row.type === 'FALSE_POSITIVE') result.falsePositives = Number(row.total);
+    }
+    return result;
+  };
 
   return {
     save(entry: FeedbackEntry): void {
@@ -39,12 +49,10 @@ export function createSqliteFeedbackStore(path: string): FeedbackStore {
       );
     },
     summary(targetRef: string): FeedbackSummary {
-      const result: FeedbackSummary = { scamReports: 0, falsePositives: 0 };
-      for (const row of count.all(targetRef) as { type: string; total: number }[]) {
-        if (row.type === 'SCAM_REPORT') result.scamReports = Number(row.total);
-        else if (row.type === 'FALSE_POSITIVE') result.falsePositives = Number(row.total);
-      }
-      return result;
+      return toSummary(count.all(targetRef));
+    },
+    totals(): FeedbackSummary {
+      return toSummary(countAll.all());
     },
     close(): void {
       db.close();

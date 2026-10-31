@@ -22,6 +22,7 @@ function memoryStore(): FeedbackStore & { saved: FeedbackEntry[] } {
     saved,
     save: (entry) => void saved.push(entry),
     summary: () => ({ scamReports: 0, falsePositives: 0 }),
+    totals: () => ({ scamReports: 0, falsePositives: 0 }),
     close: () => undefined,
   };
 }
@@ -132,6 +133,7 @@ describe('POST /api/v1/feedback', () => {
         throw new Error('disco-secreto-cheio');
       },
       summary: () => ({ scamReports: 0, falsePositives: 0 }),
+      totals: () => ({ scamReports: 0, falsePositives: 0 }),
       close: () => undefined,
     };
     await setup({}, failing);

@@ -1,51 +1,101 @@
-# API do Antifraude
+# 🔌 API — Antifraude Brasil
 
-Referência da API HTTP (ANTIGOL-004). A análise é local e determinística, somada (opcionalmente) a uma consulta ao URLhaus (ANTIGOL-005); nenhum conteúdo enviado é armazenado.
+Referência da API HTTP. A análise é feita por regras locais e, opcionalmente, por feeds públicos de ameaças. **Nenhum conteúdo enviado é armazenado.**
 
-- **Base URL local:** `http://127.0.0.1:3000` (porta conforme `.env`)
-- **Prefixo da API:** `/api/v1`
-- **Formato:** JSON (`Content-Type: application/json`)
+| Item | Valor |
+| ---- | ----- |
+| Base URL local | `http://127.0.0.1:3000` (porta conforme `.env`) |
+| Prefixo | `/api/v1` |
+| Formato | JSON (`Content-Type: application/json`) |
 
-## POST /api/v1/analyze
+---
+
+## 📋 Endpoints
+
+| Método | Rota | Para que serve |
+| ------ | ---- | -------------- |
+| `GET`  | `/health` | Verifica se a API está no ar (sem rate limit) |
+| `POST` | [`/api/v1/analyze`](#-post-apiv1analyze) | Analisa uma mensagem ou um link |
+| `POST` | [`/api/v1/feedback`](#-post-apiv1feedback) | Recebe "Isso é golpe" / "Falso positivo" |
+| `GET`  | [`/api/v1/metrics`](#-get-apiv1metrics) | Métricas anônimas de ameaças |
+
+Os erros seguem um [formato único](#️-erros).
+
+---
+
+## 🔍 POST /api/v1/analyze
 
 Analisa uma mensagem ou um link e devolve um relatório de risco.
 
-### Request
+### Requisição
 
 ```json
 { "type": "url", "content": "bradesc0.com.br" }
 ```
 
 | Campo | Tipo | Regras |
-|---|---|---|
+| ----- | ---- | ------ |
 | `type` | `"message"` ou `"url"` | obrigatório |
 | `content` | string | obrigatório; espaços nas pontas são removidos; não pode ficar vazio |
 
-Limites: mensagem até **5000** caracteres, URL até **2048** caracteres, corpo até **32 KB**. Campos extras são rejeitados. Nada é truncado em silêncio.
+**Limites:** mensagem até **5000** caracteres · URL até **2048** · corpo até **32 KB**. Campos extras são rejeitados e nada é cortado em silêncio.
 
-### Response 200
+```bash
+curl -s -X POST http://127.0.0.1:3000/api/v1/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"type":"url","content":"bradesc0.com.br"}'
+```
 
-`{ "type", "targetRef", "report" }`. O `targetRef` é uma referência opaca (HMAC-SHA256 com segredo do servidor, 64 caracteres hex) do alvo analisado, usada no `POST /api/v1/feedback` sem reenviar o conteúdo; para links, agrega pelo domínio registrável. O `report` traz `level`, `label`, `score` (0 a 100), `signals`, `advice`, `disclaimer` e `externalCheck`. O conteúdo enviado **nunca** volta na resposta. A resposta usa `Cache-Control: no-store`.
+### Resposta 200
 
-`externalCheck` informa a consulta à fonte externa de ameaças (URLhaus, abuse.ch, e Phishing.Database). Com mais de um feed ativo, o valor é o pior caso: qualquer feed `unavailable` → `unavailable`; senão algum `checked` → `checked`; senão `disabled`:
+Formato: `{ "type", "targetRef", "report" }`, com `Cache-Control: no-store`. O conteúdo enviado **nunca** volta na resposta.
+
+| Campo | O que é |
+| ----- | ------- |
+| `type` | O mesmo tipo enviado |
+| `targetRef` | Referência opaca do alvo (HMAC-SHA256, 64 caracteres hex). Usada no `/feedback` sem reenviar o conteúdo. Para links, agrupa pelo domínio registrável. |
+| `report.level` | Nível de risco (tabela abaixo) |
+| `report.label` | Nome do nível em português |
+| `report.score` | Pontuação de 0 a 100 |
+| `report.signals` | Sinais encontrados (`id`, `category`, `severity`, `weight`, `title`, `explanation`, `advice`) |
+| `report.advice` | Conselhos práticos |
+| `report.disclaimer` | Aviso de que a análise não é infalível |
+| `report.externalCheck` | Resultado da consulta aos feeds externos (tabela abaixo) |
+
+#### Níveis de risco
+
+| `level` | `label` |
+| ------- | ------- |
+| `HIGH_RISK` | 🔴 Alto Risco |
+| `NEEDS_ATTENTION` | 🟡 Requer Atenção |
+| `NO_KNOWN_INDICATORS` | ⚪ Nenhum Indicador Conhecido Encontrado |
+
+O app **nunca** afirma que algo é "100% seguro".
+
+#### `externalCheck`
+
+Feeds consultados: **URLhaus** (abuse.ch) e **Phishing.Database**. Com mais de um ativo, vale o pior caso: algum `unavailable` → `unavailable`; senão algum `checked` → `checked`; senão `disabled`.
 
 | Valor | Significado |
-|---|---|
-| `checked` | consultada com sucesso (sem sinais = nada listado) |
-| `unavailable` | falhou ou passou de 2 s; o resultado vem só das regras locais (e das consultas que deram certo) |
-| `disabled` | nenhum feed ligado (sem `URLHAUS_AUTH_KEY` e com `PHISHING_DB_ENABLED=false`); análise apenas local |
+| ----- | ----------- |
+| `checked` | Consulta feita com sucesso (sem sinais = nada listado) |
+| `unavailable` | Falhou ou passou de 2 s; o resultado vem só das regras locais (e dos feeds que responderam) |
+| `disabled` | Nenhum feed ligado (sem `URLHAUS_AUTH_KEY` e com `PHISHING_DB_ENABLED=false`) |
 
-Sinais da fonte externa (categoria `threat_intel`):
+#### Sinais dos feeds externos (categoria `threat_intel`)
 
-| ID | Quando | Severidade |
-|---|---|---|
-| `TI-URLHAUS-URL` | o link exato está listado no URLhaus | `critical` se ativo, `high` se inativo |
-| `TI-URLHAUS-HOST` | o site tem link ativo listado, sem match exato (ignorado para plataformas compartilhadas como github.com ou drive.google.com e para marcas oficiais) | `high` |
-| `TI-PHISHDB-DOMAIN` | o domínio (ou um domínio pai) consta na lista Phishing.Database, consultada em memória no servidor (ignorado para plataformas compartilhadas e marcas oficiais) | `high` |
+| ID | Quando aparece | Severidade |
+| -- | -------------- | ---------- |
+| `TI-URLHAUS-URL` | O link exato está listado no URLhaus | `critical` se ativo, `high` se inativo |
+| `TI-URLHAUS-HOST` | O site tem link ativo listado, sem match exato | `high` |
+| `TI-PHISHDB-DOMAIN` | O domínio (ou um domínio pai) está na lista Phishing.Database, consultada em memória no servidor | `high` |
 
-Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNOWN_INDICATORS` (Nenhum Indicador Conhecido Encontrado). O app nunca afirma que algo é "100% seguro".
+`TI-URLHAUS-HOST` e `TI-PHISHDB-DOMAIN` são ignorados para plataformas compartilhadas (ex.: github.com, drive.google.com) e marcas oficiais.
 
-#### Exemplo 1: URL de alto risco
+#### Exemplos
+
+<details>
+<summary><strong>1. URL de alto risco</strong> (<code>bradesc0.com.br</code>)</summary>
 
 ```json
 {
@@ -74,7 +124,10 @@ Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNO
 }
 ```
 
-#### Exemplo 2: URL sem indicadores conhecidos (`https://www.gov.br/receitafederal`)
+</details>
+
+<details>
+<summary><strong>2. URL sem indicadores</strong> (<code>https://www.gov.br/receitafederal</code>)</summary>
 
 ```json
 {
@@ -93,9 +146,12 @@ Níveis: `HIGH_RISK` (Alto Risco), `NEEDS_ATTENTION` (Requer Atenção), `NO_KNO
 }
 ```
 
-#### Exemplo 3: mensagem de golpe (Urubu do Pix)
+</details>
 
-Request: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 hora! Lucro garantido, Pix na hora." }`
+<details>
+<summary><strong>3. Mensagem de golpe</strong> (Urubu do Pix)</summary>
+
+Requisição: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 hora! Lucro garantido, Pix na hora." }`
 
 ```json
 {
@@ -124,7 +180,10 @@ Request: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 h
 }
 ```
 
-#### Exemplo 4: mensagem neutra (`Reunião amanhã às 10h na sala 3.`)
+</details>
+
+<details>
+<summary><strong>4. Mensagem neutra</strong> (<code>Reunião amanhã às 10h na sala 3.</code>)</summary>
 
 ```json
 {
@@ -143,22 +202,132 @@ Request: `{ "type": "message", "content": "Invista R$ 100 e receba R$ 500 em 1 h
 }
 ```
 
-### Erros
+</details>
 
-Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens são fixas em PT-BR e `details` traz apenas `field` e `issue`, nunca o valor recebido.
+### Limite de requisições
+
+- Cada IP pode fazer **30 requisições por minuto** (configurável por `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`). Requisições inválidas também contam.
+- Toda resposta traz `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (segundos até zerar).
+- Ao exceder: **429** com `Retry-After` (segundos).
+- Os contadores ficam só em memória durante a janela.
+- Atrás de proxy (ex.: Render), defina `TRUST_PROXY` (nº de saltos, ex.: `1`) para o limite valer por IP real; sem isso, todos dividem o IP do proxy.
+
+### 🔒 Privacidade
+
+- O conteúdo é analisado em memória e descartado. Ele não volta na resposta nem nas mensagens de erro.
+- Com o URLhaus ativo, **só o hostname** é enviado ao abuse.ch (nunca caminho, query ou mensagem), em até 3 hostnames por análise. A URL exata é comparada localmente.
+- Logs de falha do feed registram só o motivo (`timeout`, `network`, `http_status`, `invalid_response`, `too_large`).
+- Logs de requisição registram só id, método, caminho, status e tempo.
+- O resultado não é garantia de segurança: golpes novos podem não ser detectados.
+
+---
+
+## 💬 POST /api/v1/feedback
+
+Retorno anônimo sobre um resultado ("Isso é golpe" ou "Falso positivo"). O conteúdo analisado **nunca** é reenviado: o app manda só a `targetRef` recebida no `/analyze`.
+
+### Requisição
+
+```json
+{
+  "type": "SCAM_REPORT",
+  "target": { "type": "url", "ref": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f" },
+  "level": "HIGH_RISK",
+  "signalIds": ["DOM-TYPOSQUAT"]
+}
+```
+
+| Campo | Tipo | Regras |
+| ----- | ---- | ------ |
+| `type` | `"SCAM_REPORT"` ou `"FALSE_POSITIVE"` | obrigatório |
+| `target.type` | `"message"` ou `"url"` | obrigatório |
+| `target.ref` | string | obrigatório; 64 caracteres hex minúsculos (a `targetRef` do `/analyze`) |
+| `level` | `HIGH_RISK`, `NEEDS_ATTENTION` ou `NO_KNOWN_INDICATORS` | obrigatório; o nível mostrado ao usuário |
+| `signalIds` | string[] | opcional (padrão `[]`); até 20 IDs no padrão `^[A-Z0-9-]{1,40}$` |
+
+**Limites:** corpo até **4 KB**; campos extras são rejeitados. Rate limit com contador próprio (mesmos limites do `/analyze`).
+
+### Resposta 201
+
+```json
+{ "status": "received" }
+```
+
+Com `Cache-Control: no-store`. Se o armazenamento falhar: **503** `FEEDBACK_UNAVAILABLE`.
+
+### 🔒 Privacidade
+
+- Gravados apenas: tipo do feedback, tipo do alvo, `targetRef`, nível, IDs de regra e a **data** (sem hora, para não cruzar com logs de acesso).
+- Sem IP, user-agent, UUID, identificador de dispositivo ou conteúdo. Os logs não registram o corpo.
+- SQLite (`node:sqlite`). Com o padrão `FEEDBACK_DB_PATH=:memory:`, os dados zeram a cada restart.
+- Sem `FEEDBACK_HMAC_SECRET`, o segredo é aleatório por processo e as refs só agrupam até o restart.
+
+---
+
+## 📊 GET /api/v1/metrics
+
+Métricas anônimas: só contagens inteiras, agregadas em memória desde que o servidor subiu. Não recebe corpo nem parâmetros.
+
+### Resposta 200
+
+```json
+{
+  "since": "2026-10-29",
+  "generatedAt": "2026-10-29T12:00:00.000Z",
+  "analyses": { "total": 12, "byType": { "message": 8, "url": 4 } },
+  "levels": { "HIGH_RISK": 5, "NEEDS_ATTENTION": 3, "NO_KNOWN_INDICATORS": 4 },
+  "categories": { "easy_money": 4, "fake_billing": 0, "urgency": 6, "credential_request": 0, "impersonation": 1, "payment_pressure": 2, "fake_prize": 0, "fake_job": 0, "domain": 3, "url_structure": 1, "threat_intel": 0 },
+  "feedback": { "scamReports": 2, "falsePositives": 1 }
+}
+```
+
+| Campo | O que é |
+| ----- | ------- |
+| `since` | Data (sem hora) em que a contagem começou |
+| `generatedAt` | Quando o corpo foi montado (o cache pode devolvê-lo por até `METRICS_CACHE_TTL_MS`) |
+| `analyses` | Total de análises concluídas e divisão por tipo; URLs rejeitadas (`INVALID_URL`) não contam |
+| `levels` | Análises por nível de risco |
+| `categories` | Análises com ao menos um sinal da categoria (conta uma vez por análise); as 11 chaves sempre aparecem |
+| `feedback` | Totais de "Isso é golpe" e "Falso positivo" |
+
+### Cache e erros
+
+- `Cache-Control: public, max-age=<ttl em segundos>` (padrão 60). O servidor guarda o corpo em memória pelo mesmo prazo (`METRICS_CACHE_TTL_MS`, 1000 a 3600000 ms).
+- **429** `RATE_LIMIT_EXCEEDED` com contador próprio da rota.
+- Se o armazenamento de feedback falhar, a resposta continua **200** com `feedback` zerado.
+
+### 🔒 Privacidade
+
+- Só inteiros por categoria fixa: nenhum conteúdo, `targetRef`, IP, ID de regra ou hora de análise.
+- Os contadores ficam em memória e zeram a cada restart (no Render Free, também na hibernação).
+
+---
+
+## ⚠️ Erros
+
+Formato único em todas as rotas:
+
+```json
+{ "error": { "code": "...", "message": "...", "details": [] } }
+```
+
+As mensagens são fixas em português. `details` (opcional) traz só `field` e `issue`, **nunca** o valor recebido.
 
 | Status | `code` | Quando |
-|---|---|---|
-| 400 | `MALFORMED_JSON` | corpo não é JSON válido |
-| 413 | `PAYLOAD_TOO_LARGE` | corpo maior que 32 KB |
+| ------ | ------ | ------ |
+| 400 | `MALFORMED_JSON` | O corpo não é JSON válido |
+| 404 | `NOT_FOUND` | Rota inexistente (inclui `GET /api/v1/analyze`) |
+| 413 | `PAYLOAD_TOO_LARGE` | Corpo acima do limite da rota |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` diferente de JSON |
-| 422 | `VALIDATION_ERROR` | corpo ausente ou não-objeto, `type` desconhecido, `content` ausente, não-string, vazio, acima do limite, ou campos extras |
-| 422 | `INVALID_URL` | link rejeitado: `EMPTY`, `TOO_LONG`, `INVALID_URL`, `UNSUPPORTED_SCHEME`, `LOCAL_HOSTNAME` ou `PRIVATE_ADDRESS` |
-| 429 | `RATE_LIMIT_EXCEEDED` | limite de requisições por IP excedido; veja `Retry-After` |
-| 503 | `FEEDBACK_UNAVAILABLE` | só em `/feedback`: o armazenamento falhou; tente de novo mais tarde |
-| 404 | `NOT_FOUND` | rota inexistente (inclui `GET /api/v1/analyze`) |
-| 4xx | `REQUEST_ERROR` | outro erro de cliente detectado pelo servidor (ex.: `Content-Length` inválido); o status original é mantido |
-| 500 | `INTERNAL_ERROR` | erro inesperado, sem detalhes |
+| 422 | `VALIDATION_ERROR` | Corpo ausente ou inválido, campo faltando, tipo errado, vazio, acima do limite ou campos extras |
+| 422 | `INVALID_URL` | Link rejeitado: `EMPTY`, `TOO_LONG`, `INVALID_URL`, `UNSUPPORTED_SCHEME`, `LOCAL_HOSTNAME` ou `PRIVATE_ADDRESS` |
+| 429 | `RATE_LIMIT_EXCEEDED` | Limite por IP excedido; veja `Retry-After` |
+| 503 | `FEEDBACK_UNAVAILABLE` | Só no `/feedback`: o armazenamento falhou |
+| 4xx | `REQUEST_ERROR` | Outro erro de cliente (ex.: `Content-Length` inválido); mantém o status original |
+| 500 | `INTERNAL_ERROR` | Erro inesperado, sem detalhes |
+
+<details>
+<summary><strong>Exemplos de erro</strong></summary>
 
 422 `VALIDATION_ERROR` (`type` desconhecido):
 
@@ -202,72 +371,10 @@ Formato único: `{ "error": { "code", "message", "details"? } }`. As mensagens s
 { "error": { "code": "RATE_LIMIT_EXCEEDED", "message": "Muitas requisições enviadas. Tente novamente mais tarde." } }
 ```
 
-### Limite de requisições
-
-Cada IP pode fazer **30 requisições por minuto** em `POST /api/v1/analyze` (configurável por `RATE_LIMIT_MAX` e `RATE_LIMIT_WINDOW_MS`). Requisições inválidas também contam. `/health` não é limitado. Os contadores ficam só na memória do servidor durante a janela. Atrás de proxy reverso (ex.: Render), defina `TRUST_PROXY` (nº de saltos, ex.: `1`) para o limite valer por IP real do cliente; sem isso todos compartilham o IP do proxy.
-
-Toda resposta desta rota traz `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (segundos até zerar). Ao exceder, a resposta é 429 com `Retry-After` (segundos).
-
-### Exemplo com curl
-
-```bash
-curl -s -X POST http://127.0.0.1:3000/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"type":"url","content":"bradesc0.com.br"}'
-```
-
-### Privacidade
-
-- Nada é armazenado: o conteúdo é analisado em memória e descartado.
-- Com o URLhaus ativo, **somente o hostname** (nunca o caminho, a query ou a mensagem) é enviado ao abuse.ch, em até 3 hostnames distintos por análise. A URL exata é comparada localmente. Os logs de falha registram apenas o motivo (`timeout`, `network`, `http_status`, `invalid_response`, `too_large`).
-- O conteúdo enviado não volta na resposta, nem em mensagens de erro; os logs registram apenas id, método, caminho, status e tempo.
-- O resultado não é garantia de segurança: a análise usa sinais conhecidos e pode não detectar golpes novos.
-
----
-
-## POST /api/v1/feedback
-
-Retorno anônimo do usuário sobre um resultado ("Isso é golpe" ou "Falso positivo", ANTIGOL-017). O conteúdo analisado **nunca** é reenviado: o app manda só a `targetRef` recebida no `/analyze`.
-
-### Request
-
-```json
-{
-  "type": "SCAM_REPORT",
-  "target": { "type": "url", "ref": "9f2c4e1a7b8d3c5f6a0e1d2b3c4a5f60718293a4b5c6d7e8f9012a3b4c5d6e7f" },
-  "level": "HIGH_RISK",
-  "signalIds": ["DOM-TYPOSQUAT"]
-}
-```
-
-| Campo | Tipo | Regras |
-|---|---|---|
-| `type` | `"SCAM_REPORT"` ou `"FALSE_POSITIVE"` | obrigatório |
-| `target.type` | `"message"` ou `"url"` | obrigatório |
-| `target.ref` | string | obrigatório; 64 caracteres hex minúsculos (a `targetRef` do `/analyze`) |
-| `level` | `HIGH_RISK`, `NEEDS_ATTENTION` ou `NO_KNOWN_INDICATORS` | obrigatório; o nível exibido ao usuário |
-| `signalIds` | string[] | opcional (padrão `[]`); até 20 IDs de regra no padrão `^[A-Z0-9-]{1,40}$` |
-
-Corpo até **4 KB**; campos extras são rejeitados.
-
-### Response 201
-
-```json
-{ "status": "received" }
-```
-
-Usa `Cache-Control: no-store`.
-
-### Erros
-
-Mesmo formato do `/analyze`: 400 `MALFORMED_JSON`, 413 `PAYLOAD_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE`, 422 `VALIDATION_ERROR`, 429 `RATE_LIMIT_EXCEEDED` (contador próprio da rota, mesmos limites) e 503 `FEEDBACK_UNAVAILABLE`:
+503 `FEEDBACK_UNAVAILABLE`:
 
 ```json
 { "error": { "code": "FEEDBACK_UNAVAILABLE", "message": "Não foi possível registrar seu retorno agora. Tente novamente mais tarde." } }
 ```
 
-### Privacidade
-
-- São gravados apenas: tipo do feedback, tipo do alvo, `targetRef`, nível, IDs de regra e a **data** (sem hora, para não correlacionar com logs de acesso).
-- Não há IP, user-agent, UUID, identificador de dispositivo nem conteúdo. Os logs não registram o corpo.
-- Armazenamento em SQLite (`node:sqlite`); com o padrão `FEEDBACK_DB_PATH=:memory:` os dados zeram a cada restart. Sem `FEEDBACK_HMAC_SECRET` o segredo é aleatório por processo, e as refs só agregam até o restart.
+</details>

@@ -6,6 +6,7 @@ import type {
   ApiErrorCode,
   ApiErrorDetail,
   FeedbackRequest,
+  MetricsResponse,
 } from '../types/api';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -147,6 +148,11 @@ export function sendFeedback(input: FeedbackRequest, options?: RequestOptions): 
     },
     options,
   );
+}
+
+/** Painel anônimo de ameaças: GET sem corpo e sem identificadores. */
+export function getMetrics(options?: RequestOptions): Promise<MetricsResponse> {
+  return request<MetricsResponse>('/api/v1/metrics', { method: 'GET', headers: { Accept: 'application/json' } }, options);
 }
 
 const URL_SCHEME = /^https?:\/\//i;

@@ -5,3 +5,7 @@ coverage/
 .env.*
 !.env.example
 *.log
+
+# Instruções para a IA (não versionar)
+/CLAUDE.md
+apps/mobile/AGENTS.md

@@ -1,4 +1,5 @@
 import { useNetworkState } from 'expo-network';
+import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -146,6 +147,10 @@ export default function Index() {
             feedbackDisabled={offline}
           />
         ) : null}
+
+        <Link href="/metrics" testID="metrics-link" className="mt-8 text-center text-base text-gray-700 underline">
+          Ver painel de ameaças
+        </Link>
       </ScrollView>
     </KeyboardAvoidingView>
   );

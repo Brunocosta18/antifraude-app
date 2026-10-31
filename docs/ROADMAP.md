@@ -1,44 +1,56 @@
-# Roadmap
+# 🗺️ Roadmap — Antifraude Brasil
 
-Backlog por tarefa (`ANTIGOL-XXX`). Atualize o status ao entregar.
+Backlog do projeto dividido em tarefas `ANTIGOL-XXX`. Atualize o status ao entregar cada uma.
 
-# 🗺️ Antifraude API — Roadmap do Projeto
-
-## 🎯 Visão Geral
-Sistema de detecção de fraudes, golpes e engenharia social focado no mercado brasileiro, orientado à privacidade (LGPD), com arquitetura limpa, tempo de resposta baixo e custo zero de infraestrutura ($0/mês).
+**Visão:** detectar golpes, fraudes e engenharia social no Brasil, com privacidade (LGPD), arquitetura limpa, resposta rápida e custo $0/mês.
 
 ---
 
-## 🟢 Fase 1: Backend Core & Inteligência Local (Concluído)
-- [x] **ANTIGOL-001**: Estrutura base da API com Fastify, TypeScript, Zod e Clean/Hexagonal Architecture.
-- [x] **ANTIGOL-002**: Validação estrita de entrada e sanitização para prevenção de vazamento de PII.
-- [x] **ANTIGOL-003**: Motor de análise local determinístico (Regex/Heurísticas para Golpes do PIX, Phishing e Typosquatting).
-- [x] **ANTIGOL-004**: Endpoint `POST /api/v1/analyze` padronizado com níveis de risco (`NO_KNOWN_INDICATORS`, `SUSPICIOUS`, `HIGH_RISK`).
+## 📊 Resumo
 
-## 🟢 Fase 2: Feeds de Ameaças & Endurecimento de Segurança (Concluído)
-- [x] **ANTIGOL-005**: Integração com Threat Feed externo (URLhaus) com timeout rigoroso (2s) e Graceful Degradation.
-- [x] **ANTIGOL-006**: Proteção de API via `@fastify/rate-limit` (30 req/min por IP configurável via `.env`) e resposta HTTP 429 padronizada.
-
----
-
-## 🟡 Fase 3: Interface do Usuário — Frontend / Mobile App (Próximo Passo)
-- [x] **ANTIGOL-007**: Setup da aplicação mobile/web com **Expo + Expo Router + NativeWind (Tailwind CSS v3)** em `apps/mobile/`, com cliente de API (`timeout`, `AppError`, `429`).
-- [x] **ANTIGOL-008**: Construção da tela principal de análise (input para colar mensagens/links suspeitos e botão direto de verificação).
-- [x] **ANTIGOL-009**: Tela de resultados intuitiva (card visual com nível de risco em verde/amarelo/vermelho, lista de sinais e conselhos práticos).
-- [x] **ANTIGOL-010**: Integração do cliente com a API backend, tratando estado de carregamento, erros de rede e limite de requisições (`429`).
-- [x] **ANTIGOL-011**: Suporte a PWA / Instalação no celular e modo offline amigável.
+| Fase | Tema                                   | Tarefas      | Status        |
+| ---- | -------------------------------------- | ------------ | ------------- |
+| 1    | Backend core e inteligência local      | 001 – 004    | ✅ Concluída |
+| 2    | Feeds de ameaças e segurança           | 005 – 006    | ✅ Concluída |
+| 3    | Interface (app mobile/web)             | 007 – 011    | ✅ Concluída |
+| 4    | Infraestrutura, CI/CD e deploy         | 012 – 015    | ✅ Concluída |
+| 5    | Inteligência e funcionalidades avançadas | 016 – 018  | ✅ Concluída |
 
 ---
 
-## 🟢 Fase 4: Infraestrutura, CI/CD & Deploy ($0/mês) (Concluído)
-- [x] **ANTIGOL-012**: Containerização com `Dockerfile` multi-stage otimizado e `docker-compose.yml`.
-- [x] **ANTIGOL-013**: Configuração de esteira de CI/CD via **GitHub Actions** (run tests, typecheck e linter automatizados a cada PR/push).
-- [x] **ANTIGOL-014**: Deploy da API em plataforma de hospedagem gratuita (**Render Free**, via `render.yaml` e `docs/DEPLOY.md`) com variáveis de ambiente configuradas e `TRUST_PROXY` para o rate limit por IP real.
-- [x] **ANTIGOL-015**: Deploy da interface Web/PWA na **Vercel Hobby** (export estático `expo export -p web`, `apps/mobile/vercel.json` e `docs/DEPLOY.md`) com `EXPO_PUBLIC_API_URL` no build e `CORS_ORIGIN` no Render.
+## 🧠 Fase 1 — Backend core e inteligência local
+
+- [x] **ANTIGOL-001** — Estrutura base da API: Fastify, TypeScript, Zod e arquitetura limpa/hexagonal.
+- [x] **ANTIGOL-002** — Validação estrita e sanitização da entrada, sem vazamento de dados pessoais.
+- [x] **ANTIGOL-003** — Motor de análise local (regex e heurísticas para golpes do Pix, phishing e typosquatting).
+- [x] **ANTIGOL-004** — Endpoint `POST /api/v1/analyze` com níveis de risco (`HIGH_RISK`, `NEEDS_ATTENTION`, `NO_KNOWN_INDICATORS`).
+
+## 🛡️ Fase 2 — Feeds de ameaças e segurança
+
+- [x] **ANTIGOL-005** — Feed externo URLhaus, timeout de 2 s e fallback para as regras locais.
+- [x] **ANTIGOL-006** — Rate limit por IP (`@fastify/rate-limit`, 30 req/min configurável) com resposta 429 padronizada.
+
+## 📱 Fase 3 — Interface (app mobile/web)
+
+- [x] **ANTIGOL-007** — Setup do app em `apps/mobile/` (Expo + Expo Router + NativeWind) e cliente da API (timeout, `AppError`, 429).
+- [x] **ANTIGOL-008** — Tela principal: campo para colar mensagem/link e botão de verificar.
+- [x] **ANTIGOL-009** — Card de resultado com cor por nível de risco, sinais e conselhos.
+- [x] **ANTIGOL-010** — Estados de carregamento, erros de rede e limite de requisições (429).
+- [x] **ANTIGOL-011** — PWA (instalável no celular) e modo offline.
+
+## 🚀 Fase 4 — Infraestrutura, CI/CD e deploy ($0/mês)
+
+- [x] **ANTIGOL-012** — `Dockerfile` multi-stage e `docker-compose.yml`.
+- [x] **ANTIGOL-013** — CI no GitHub Actions: testes, typecheck e smoke do Docker a cada push/PR.
+- [x] **ANTIGOL-014** — Deploy da API no **Render Free** (`render.yaml`) com `TRUST_PROXY` para o rate limit usar o IP real.
+- [x] **ANTIGOL-015** — Deploy da PWA na **Vercel Hobby** (export estático), com `EXPO_PUBLIC_API_URL` no build e `CORS_ORIGIN` no Render.
+
+## 🔬 Fase 5 — Inteligência e funcionalidades avançadas
+
+- [x] **ANTIGOL-016** — Feed **Phishing.Database** consultado em memória no servidor (`TI-PHISHDB-DOMAIN`, combinado com o URLhaus) e **validação local de chave Pix** no app (a chave nunca vai para a API).
+- [x] **ANTIGOL-017** — Feedback anônimo "Isso é golpe" / "Falso positivo" (`POST /api/v1/feedback`): só uma referência opaca (`targetRef`, HMAC) em SQLite, sem conteúdo, IP nem identificador de dispositivo.
+- [x] **ANTIGOL-018** — Painel de métricas anônimas: contadores em memória, `GET /api/v1/metrics` com cache e tela `/metrics` no app (sem biblioteca de gráficos).
 
 ---
 
-## 🟣 Fase 5: Evolução da Inteligência & Funcionalidades Avançadas (Futuro)
-- [x] **ANTIGOL-016**: Novo feed aberto **Phishing.Database** (lista de domínios de phishing baixada pelo servidor e consultada em memória, `TI-PHISHDB-DOMAIN`, composição com o URLhaus via `combineFeeds`) e **validação local de chaves Pix** no app (CPF/CNPJ, e-mail, telefone, chave aleatória; a chave nunca é enviada à API).
-- [x] **ANTIGOL-017**: Mecanismo de feedback do usuário ("Isso é um golpe?" / "Falso positivo") focado em privacidade: `POST /api/v1/feedback` com referência opaca (`targetRef`, HMAC) e armazenamento anônimo em SQLite, sem conteúdo, IP nem identificador de dispositivo.
-- [ ] **ANTIGOL-018**: Painel/Dashboard de métricas anônimas de ameaças detectadas no Brasil.
+📚 Detalhes de cada endpoint em [`API.md`](API.md) · deploy em [`DEPLOY.md`](DEPLOY.md).

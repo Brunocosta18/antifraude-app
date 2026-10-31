@@ -9,12 +9,14 @@ import { errorHandler, notFoundHandler } from './api/errors.js';
 import { analyzeRoutes } from './api/routes/analyze.js';
 import { feedbackRoutes } from './api/routes/feedback.js';
 import { healthRoutes } from './api/routes/health.js';
+import { metricsRoutes } from './api/routes/metrics.js';
 import { combineFeeds } from './adapters/composite-feed.js';
 import { createPhishingDatabaseFeed, PHISHING_DB_LIST_URL } from './adapters/phishing-database.js';
 import { createSqliteFeedbackStore } from './adapters/sqlite-feedback-store.js';
 import { createUrlhausFeed, disabledThreatFeed } from './adapters/urlhaus.js';
 import type { AppConfig } from './config/env.js';
 import type { FeedbackStore } from './core/feedback/types.js';
+import { createMetricsCounter, type MetricsCounter } from './core/metrics/counter.js';
 import type { ThreatFeed } from './core/types.js';
 
 /**
@@ -59,7 +61,7 @@ function trustProxyOption(trustProxy: boolean | number): boolean | ((address: st
 }
 
 /** Fábrica da aplicação: monta plugins e rotas sem abrir porta (facilita testes). */
-export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed; feedbackStore?: FeedbackStore } = {}): Promise<FastifyInstance> {
+export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFeed; feedbackStore?: FeedbackStore; metrics?: MetricsCounter; now?: () => number } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: loggerOptions(config), trustProxy: trustProxyOption(config.trustProxy) });
 
   let threatFeed = deps.threatFeed ?? disabledThreatFeed;
@@ -94,6 +96,8 @@ export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFee
   const feedbackStore = deps.feedbackStore ?? createSqliteFeedbackStore(config.feedbackDbPath);
   app.addHook('onClose', async () => feedbackStore.close());
 
+  const metrics = deps.metrics ?? createMetricsCounter();
+
   await app.register(helmet);
   await app.register(cors, {
     origin: config.corsOrigin === true ? true : [...config.corsOrigin],
@@ -113,11 +117,21 @@ export async function buildApp(config: AppConfig, deps: { threatFeed?: ThreatFee
     prefix: '/api/v1',
     threatFeed,
     feedbackSecret,
+    metrics,
     rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
   });
   await app.register(feedbackRoutes, {
     prefix: '/api/v1',
     store: feedbackStore,
+    rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
+  });
+
+  await app.register(metricsRoutes, {
+    prefix: '/api/v1',
+    counter: metrics,
+    feedbackStore,
+    cacheTtlMs: config.metricsCacheTtlMs,
+    now: deps.now ?? Date.now,
     rateLimit: { max: config.rateLimitMax, timeWindow: config.rateLimitWindowMs },
   });
 

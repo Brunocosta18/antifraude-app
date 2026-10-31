@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { analyzeMessageWithFeed, analyzeUrlWithFeed } from '../../core/analyzer.js';
 import { computeTargetRef } from '../../core/feedback/target-ref.js';
-import type { ThreatFeed } from '../../core/types.js';
+import type { AnalyzeType, MetricsCounter } from '../../core/metrics/counter.js';
+import type { AnalysisReport, ThreatFeed } from '../../core/types.js';
 import { requireJsonContentType } from '../content-type.js';
 import { invalidUrlError, rateLimitError, validationError, zodIssuesToDetails } from '../errors.js';
 import { analyzeRequestSchema, analyzeResponseSchema } from '../schemas/analyze.js';
@@ -17,8 +18,18 @@ const ANALYZE_BODY_LIMIT = 32 * 1024;
 export const analyzeRoutes: FastifyPluginAsync<{
   threatFeed: ThreatFeed;
   feedbackSecret: string;
+  metrics: MetricsCounter;
   rateLimit: { max: number; timeWindow: number };
-}> = async (app, { threatFeed, feedbackSecret, rateLimit }) => {
+}> = async (app, { threatFeed, feedbackSecret, metrics, rateLimit }) => {
+  /** Contagem agregada (só nível e categorias). Uma falha de métricas nunca derruba a análise. */
+  const record = (type: AnalyzeType, report: AnalysisReport): void => {
+    try {
+      metrics.record(type, report);
+    } catch {
+      // silencioso de propósito
+    }
+  };
+
   app.addHook('preValidation', requireJsonContentType);
 
   app.post(
@@ -38,11 +49,13 @@ export const analyzeRoutes: FastifyPluginAsync<{
 
       if (type === 'message') {
         const report = await analyzeMessageWithFeed(content, threatFeed);
+        record(type, report);
         return { type, targetRef: computeTargetRef(feedbackSecret, type, content), report };
       }
 
       const result = await analyzeUrlWithFeed(content, threatFeed);
       if (!result.ok) throw invalidUrlError(result.reason);
+      record(type, result.value);
       return { type, targetRef: computeTargetRef(feedbackSecret, type, content), report: result.value };
     },
   );

@@ -40,6 +40,8 @@ const envSchema = z
       .refine((secret) => secret === null || secret.length >= 32, 'Use ao menos 32 caracteres.'),
     // Caminho do SQLite do feedback; ':memory:' zera a cada restart.
     FEEDBACK_DB_PATH: z.string().trim().min(1).default(':memory:'),
+    // Validade do cache de GET /metrics (ANTIGOL-018).
+    METRICS_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
     // Atrás de proxy reverso (ex.: Render): 'true' | 'false' | nº de saltos (1 a 10). Sem isso o rate limit enxerga só o IP do proxy.
     TRUST_PROXY: z
       .string()
@@ -89,6 +91,8 @@ export interface AppConfig {
   /** `null` = o app gera um segredo aleatório por processo (as refs agregam só até o restart). */
   readonly feedbackHmacSecret: string | null;
   readonly feedbackDbPath: string;
+  /** Validade do cache de `GET /metrics`. */
+  readonly metricsCacheTtlMs: number;
 }
 
 export class ConfigError extends Error {
@@ -135,6 +139,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     TRUST_PROXY,
     FEEDBACK_HMAC_SECRET,
     FEEDBACK_DB_PATH,
+    METRICS_CACHE_TTL_MS,
   } = parsed.data;
   return Object.freeze({
     nodeEnv: NODE_ENV,
@@ -152,5 +157,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: TRUST_PROXY,
     feedbackHmacSecret: FEEDBACK_HMAC_SECRET,
     feedbackDbPath: FEEDBACK_DB_PATH,
+    metricsCacheTtlMs: METRICS_CACHE_TTL_MS,
   });
 }

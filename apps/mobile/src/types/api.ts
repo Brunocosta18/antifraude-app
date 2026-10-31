@@ -50,6 +50,29 @@ export interface FeedbackRequest {
   signalIds: string[];
 }
 
+export type SignalCategory =
+  | 'easy_money'
+  | 'fake_billing'
+  | 'urgency'
+  | 'credential_request'
+  | 'impersonation'
+  | 'payment_pressure'
+  | 'fake_prize'
+  | 'fake_job'
+  | 'domain'
+  | 'url_structure'
+  | 'threat_intel';
+
+/** Resposta de GET /api/v1/metrics: só contagens agregadas e anônimas. */
+export interface MetricsResponse {
+  since: string;
+  generatedAt: string;
+  analyses: { total: number; byType: Record<AnalyzeType, number> };
+  levels: Record<RiskLevel, number>;
+  categories: Record<SignalCategory, number>;
+  feedback: { scamReports: number; falsePositives: number };
+}
+
 export interface ApiErrorDetail {
   field: string;
   issue: string;

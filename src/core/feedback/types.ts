@@ -21,5 +21,7 @@ export interface FeedbackSummary {
 export interface FeedbackStore {
   save(entry: FeedbackEntry): void;
   summary(targetRef: string): FeedbackSummary;
+  /** Totais gerais (todas as refs), para o painel de métricas (ANTIGOL-018). */
+  totals(): FeedbackSummary;
   close(): void;
 }

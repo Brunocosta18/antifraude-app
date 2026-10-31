@@ -1,4 +1,4 @@
-import { analyze, analyzeTarget, detectAnalyzeType, isAppError, sendFeedback } from '../api';
+import { analyze, analyzeTarget, detectAnalyzeType, getMetrics, isAppError, sendFeedback } from '../api';
 import type { AppError } from '../api';
 import type { AnalyzeResponse } from '../../types/api';
 
@@ -212,5 +212,18 @@ describe('sendFeedback', () => {
     const err = await catchError(sendFeedback(input, { fetchFn }));
     expect(err.code).toBe('FEEDBACK_UNAVAILABLE');
     expect(err.status).toBe(503);
+  });
+});
+
+describe('getMetrics', () => {
+  it('faz GET em /api/v1/metrics, sem corpo e só com Accept', async () => {
+    const body = { since: '2026-10-29' };
+    const fetchFn = fake(async () => jsonResponse(200, body));
+    await expect(getMetrics({ fetchFn })).resolves.toEqual(body);
+    const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/api\/v1\/metrics$/);
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(Object.keys(init.headers as object)).toEqual(['Accept']);
   });
 });
